@@ -1,3 +1,4 @@
+import secrets
 import pytest
 from httpx import AsyncClient, ASGITransport
 from app.main import app
@@ -159,12 +160,13 @@ async def test_worker_profile():
 
 @pytest.mark.asyncio
 async def test_auth_flow_signup_login():
+    test_password = f"SafeTest_{secrets.token_hex(8)}"
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         # 1. Signup new worker
         signup_payload = {
             "name": "Pooja Verma",
             "email": "pooja.asha@gov.in",
-            "password": "SecurePassword123",
+            "password": test_password,
             "role": "ASHA Health Worker",
             "village": "Rampur Ward 5",
             "preferred_language": "hi",
@@ -184,7 +186,7 @@ async def test_auth_flow_signup_login():
         # 3. Login with correct credentials
         login_resp = await ac.post("/api/v1/auth/login", json={
             "email": "pooja.asha@gov.in",
-            "password": "SecurePassword123"
+            "password": test_password
         })
         assert login_resp.status_code == 200
         login_data = login_resp.json()
@@ -194,7 +196,7 @@ async def test_auth_flow_signup_login():
         # 4. Login with invalid password should return 401
         wrong_pwd_resp = await ac.post("/api/v1/auth/login", json={
             "email": "pooja.asha@gov.in",
-            "password": "WrongPassword!"
+            "password": "WrongPassword_" + secrets.token_hex(4)
         })
         assert wrong_pwd_resp.status_code == 401
 
@@ -478,14 +480,11 @@ async def test_offline_save_followed_by_online_sync():
 @pytest.mark.asyncio
 async def test_demo_account_login_success():
     """
-    Verifies that the pre-configured demo account logs in successfully
-    with kavita.asha@gov.in and AshaCare@2026.
+    Verifies that the backend-managed demo session succeeds
+    without client-side plain credentials.
     """
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        resp = await ac.post("/api/v1/auth/login", json={
-            "email": "kavita.asha@gov.in",
-            "password": "AshaCare@2026"
-        })
+        resp = await ac.post("/api/v1/auth/demo-login")
         assert resp.status_code == 200
         data = resp.json()
         assert "access_token" in data
@@ -496,12 +495,12 @@ async def test_demo_account_login_success():
 @pytest.mark.asyncio
 async def test_demo_account_wrong_password_rejected():
     """
-    Verifies that incorrect credentials for the demo account are rejected.
+    Verifies that incorrect credentials for any account are rejected.
     """
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         resp = await ac.post("/api/v1/auth/login", json={
             "email": "kavita.asha@gov.in",
-            "password": "WrongPassword123"
+            "password": "InvalidPassword_" + secrets.token_hex(4)
         })
         assert resp.status_code == 401
         assert "Invalid email or password" in resp.json()["detail"]
@@ -517,12 +516,10 @@ async def test_user_data_isolation_multi_tenant():
     4. Demo User A cannot see User B's patient or visit.
     5. User B cannot view Demo User A's patient history.
     """
+    user_b_pwd = f"UserBPass_{secrets.token_hex(8)}"
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        # 1. Login as Demo User A
-        login_a = await ac.post("/api/v1/auth/login", json={
-            "email": "kavita.asha@gov.in",
-            "password": "AshaCare@2026"
-        })
+        # 1. Login as Demo User A via secure backend demo session
+        login_a = await ac.post("/api/v1/auth/demo-login")
         assert login_a.status_code == 200
         token_a = login_a.json()["access_token"]
         headers_a = {"Authorization": f"Bearer {token_a}"}
@@ -537,7 +534,7 @@ async def test_user_data_isolation_multi_tenant():
         signup_b = await ac.post("/api/v1/auth/signup", json={
             "name": "Anita Devi",
             "email": "anita.asha@gov.in",
-            "password": "PasswordAnita123",
+            "password": user_b_pwd,
             "role": "ASHA Health Worker",
             "village": "Village B",
             "phone": "+91 91111 22222"

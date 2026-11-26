@@ -43,18 +43,17 @@ With **ASHA Awaaz**, the worker does not type. She simply speaks naturally in **
 
 ---
 
-## 2. Evaluation Demo Account
+## 2. Evaluation Demo Access
 
-For hackathon evaluators and judges, the application includes pre-configured credentials and a 1-click evaluation login button on the Sign In page:
+For hackathon evaluators and judges, the application includes a secure **1-Click Evaluator Demo Access** workflow directly on the Sign In page that provisions an isolated, scoped demo session without exposing sensitive credentials in client bundles:
 
-| Field | Demo Credential |
+| Field | Evaluation Access Detail |
 |---|---|
-| **Portal URL** | `http://localhost:5173` (or deployed URL) |
-| **Email Address** | `kavita.asha@gov.in` |
-| **Password** | `AshaCare@2026` |
-| **Worker Profile** | Smt. Kavita Sharma (Senior ASHA Worker, PHC Rampur) |
-| **1-Click Login** | Click **"⚡ Evaluator 1-Click Login"** on the Sign In page |
+| **Live Web App** | https://frontend-seven-xi-3gymmbfqqb.vercel.app |
+| **Demo Session** | Smt. Kavita Sharma (Senior ASHA Worker, PHC Rampur) |
+| **1-Click Demo Login** | Click **"⚡ 1-Click Demo Evaluation"** on the Sign In page |
 | **Zero-Mic Simulation**| Click **"Run Demo (No Mic)"** on the top navigation bar |
+| **Custom Registration**| Register any new account on `/signup` for a clean personal dashboard |
 
 ---
 

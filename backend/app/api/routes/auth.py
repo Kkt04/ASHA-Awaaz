@@ -8,7 +8,7 @@ import jwt
 from fastapi import APIRouter, HTTPException, Header, status
 
 from app.config import settings
-from app.database.mongodb import db_manager, DEMO_WORKER_ID, DEMO_EMAIL, DEMO_PASSWORD_HASH, DEMO_SALT
+from app.database.mongodb import db_manager, DEMO_WORKER_ID, DEMO_EMAIL
 from app.schemas.auth import (
     WorkerProfile,
     UserSignupRequest,
@@ -55,6 +55,32 @@ def decode_access_token(token: str) -> Optional[dict]:
     except jwt.PyJWTError as e:
         logger.warning(f"Invalid JWT token: {e}")
         return None
+
+
+@router.post("/auth/demo-login", response_model=AuthResponse)
+async def demo_worker_login():
+    """
+    Secure backend-managed demo session for hackathon evaluation and review.
+    Does not require client-side credentials or hardcoded passwords.
+    Operates in a strictly isolated demo workspace (ASHA_WORKER_001) with fictional patients.
+    """
+    workers_col = db_manager.get_collection("workers")
+    demo_worker = await workers_col.find_one({"worker_id": DEMO_WORKER_ID})
+    if not demo_worker:
+        await db_manager.ensure_seed_data()
+        demo_worker = await workers_col.find_one({"worker_id": DEMO_WORKER_ID})
+
+    token = create_access_token(DEMO_WORKER_ID, DEMO_EMAIL, "ASHA Health Worker")
+    profile = WorkerProfile(
+        worker_id=DEMO_WORKER_ID,
+        name=demo_worker.get("name", "Kavita Sharma") if demo_worker else "Kavita Sharma",
+        email=DEMO_EMAIL,
+        role="ASHA Health Worker",
+        village=demo_worker.get("village", "Rampur (Sub-Centre Kalyanpur)") if demo_worker else "Rampur (Sub-Centre Kalyanpur)",
+        preferred_language=demo_worker.get("preferred_language", "en") if demo_worker else "en",
+        phone=demo_worker.get("phone", "+91 98765 12345") if demo_worker else "+91 98765 12345"
+    )
+    return AuthResponse(access_token=token, token_type="bearer", worker=profile)
 
 
 @router.post("/auth/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
@@ -120,26 +146,11 @@ async def worker_login(credentials: Optional[UserLoginRequest] = None):
     Validates health worker credentials against database records
     and generates an authenticated JWT session.
     """
-    workers_col = db_manager.get_collection("workers")
-
-    # If invoked without body (demo backwards-compatibility), return demo Kavita Sharma
+    # If invoked without body (demo convenience), safely route to demo login
     if not credentials or not credentials.email:
-        demo_worker = await workers_col.find_one({"worker_id": DEMO_WORKER_ID})
-        if not demo_worker:
-            demo_worker = await workers_col.find_one({"email": DEMO_EMAIL})
+        return await demo_worker_login()
 
-        token = create_access_token(DEMO_WORKER_ID, DEMO_EMAIL, "ASHA Health Worker")
-        profile = WorkerProfile(
-            worker_id=DEMO_WORKER_ID,
-            name=demo_worker.get("name", "Kavita Sharma") if demo_worker else "Kavita Sharma",
-            email=DEMO_EMAIL,
-            role="ASHA Health Worker",
-            village=demo_worker.get("village", "Rampur (Sub-Centre Kalyanpur)") if demo_worker else "Rampur (Sub-Centre Kalyanpur)",
-            preferred_language=demo_worker.get("preferred_language", "en") if demo_worker else "en",
-            phone=demo_worker.get("phone", "+91 98765 12345") if demo_worker else "+91 98765 12345"
-        )
-        return AuthResponse(access_token=token, token_type="bearer", worker=profile)
-
+    workers_col = db_manager.get_collection("workers")
     email_clean = credentials.email.strip().lower()
 
     # Look up by email or worker_id
@@ -147,34 +158,21 @@ async def worker_login(credentials: Optional[UserLoginRequest] = None):
     if not user:
         user = await workers_col.find_one({"worker_id": credentials.email.strip().upper()})
 
-    # If demo worker was not yet seeded in fresh DB instance, safely handle
-    if not user and email_clean == DEMO_EMAIL:
-        await db_manager.ensure_seed_data()
-        user = await workers_col.find_one({"email": DEMO_EMAIL})
-
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password."
         )
 
-    # Validate password
+    # Validate password using PBKDF2 hash verification
     stored_hash = user.get("password_hash")
     salt = user.get("salt")
 
-    if not stored_hash or not salt:
-        # Legacy fallback verification for demo account
-        if credentials.password != "AshaCare@2026":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password."
-            )
-    else:
-        if not verify_password(credentials.password, stored_hash, salt):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password."
-            )
+    if not stored_hash or not salt or not verify_password(credentials.password, stored_hash, salt):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password."
+        )
 
     worker_id = user["worker_id"]
     token = create_access_token(worker_id, user.get("email", email_clean), user.get("role", "ASHA Health Worker"))
@@ -211,8 +209,8 @@ async def get_worker_profile(authorization: Optional[str] = Header(None)):
             if user:
                 return WorkerProfile(
                     worker_id=user["worker_id"],
-                    name=user.get("name", "Kavita Sharma"),
-                    email=user.get("email", "kavita.asha@gov.in"),
+                    name=user.get("name", "ASHA Worker"),
+                    email=user.get("email"),
                     role=user.get("role", "ASHA Health Worker"),
                     village=user.get("village", "Rampur (Sub-Centre Kalyanpur)"),
                     preferred_language=user.get("preferred_language", "en"),

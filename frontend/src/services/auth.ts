@@ -94,6 +94,27 @@ export const authService = {
     }
   },
 
+  async demoLogin(): Promise<AuthSuccessPayload> {
+    try {
+      const res = await fetch(`${API_BASE}/auth/demo-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'Demo login failed.');
+      }
+
+      if (data?.access_token) {
+        this.setSession(data.access_token, data.worker);
+      }
+      return data;
+    } catch (err: any) {
+      throw new Error(err.message || 'Demo authentication service could not be reached.');
+    }
+  },
+
   async signup(payload: SignupPayload): Promise<AuthSuccessPayload> {
     try {
       const res = await fetch(`${API_BASE}/auth/signup`, {

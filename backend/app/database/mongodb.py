@@ -1,4 +1,6 @@
 import logging
+import secrets
+import hashlib
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 import uuid
@@ -9,8 +11,6 @@ logger = logging.getLogger(__name__)
 
 DEMO_WORKER_ID = "ASHA_WORKER_001"
 DEMO_EMAIL = "kavita.asha@gov.in"
-DEMO_SALT = "asha_salt_2026"
-DEMO_PASSWORD_HASH = "1952f9a02dfc6d05ff1b655de7e238f83cf3d9fd520c8ea556544ed614b048f3"
 
 
 class InMemoryCollection:
@@ -161,14 +161,17 @@ class DatabaseManager:
         patients_col = self._in_memory_collections["patients"]
         now = datetime.now(timezone.utc).isoformat()
 
-        # Demo Worker: Kavita Sharma
+        # Securely initialized demo worker
+        salt = secrets.token_hex(16)
+        pwd_hash = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
+
         workers_col._data["WORKER_001"] = {
             "_id": "WORKER_001",
             "worker_id": DEMO_WORKER_ID,
             "name": "Kavita Sharma",
             "email": DEMO_EMAIL,
-            "password_hash": DEMO_PASSWORD_HASH,
-            "salt": DEMO_SALT,
+            "password_hash": pwd_hash,
+            "salt": salt,
             "role": "ASHA Health Worker",
             "village": "Rampur (Sub-Centre Kalyanpur)",
             "phone": "+91 98765 12345",
@@ -230,12 +233,10 @@ class DatabaseManager:
     async def ensure_seed_data(self):
         """
         Async idempotent seed mechanism for MongoDB or runtime instances.
-        Ensures demo account exists with correct password hash and salt,
-        and safely isolates any legacy unowned records.
+        Ensures demo account exists and safely isolates any legacy unowned records.
         """
         workers_col = self.get_collection("workers")
         patients_col = self.get_collection("patients")
-        visits_col = self.get_collection("visits")
         now = datetime.now(timezone.utc).isoformat()
 
         # 1. Ensure Demo Worker
@@ -243,35 +244,25 @@ class DatabaseManager:
         if not demo_worker:
             demo_worker = await workers_col.find_one({"worker_id": DEMO_WORKER_ID})
 
-        demo_doc = {
-            "worker_id": DEMO_WORKER_ID,
-            "name": "Kavita Sharma",
-            "email": DEMO_EMAIL,
-            "password_hash": DEMO_PASSWORD_HASH,
-            "salt": DEMO_SALT,
-            "role": "ASHA Health Worker",
-            "village": "Rampur (Sub-Centre Kalyanpur)",
-            "phone": "+91 98765 12345",
-            "preferred_language": "en",
-            "created_at": now,
-            "updated_at": now
-        }
-
         if not demo_worker:
-            demo_doc["_id"] = "WORKER_001"
+            salt = secrets.token_hex(16)
+            pwd_hash = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
+            demo_doc = {
+                "_id": "WORKER_001",
+                "worker_id": DEMO_WORKER_ID,
+                "name": "Kavita Sharma",
+                "email": DEMO_EMAIL,
+                "password_hash": pwd_hash,
+                "salt": salt,
+                "role": "ASHA Health Worker",
+                "village": "Rampur (Sub-Centre Kalyanpur)",
+                "phone": "+91 98765 12345",
+                "preferred_language": "en",
+                "created_at": now,
+                "updated_at": now
+            }
             await workers_col.insert_one(demo_doc)
             logger.info("Demo worker account created in database.")
-        else:
-            # Update password hash, salt, and email to guarantee demo login succeeds
-            await workers_col.update_one(
-                {"worker_id": DEMO_WORKER_ID},
-                {"$set": {
-                    "email": DEMO_EMAIL,
-                    "password_hash": DEMO_PASSWORD_HASH,
-                    "salt": DEMO_SALT,
-                    "updated_at": now
-                }}
-            )
 
         # 2. Ensure Demo Patients for ASHA_WORKER_001
         demo_patients = [
@@ -325,7 +316,6 @@ class DatabaseManager:
                 await patients_col.insert_one(p)
 
         # 3. Safe Migration: Isolate any legacy unowned records so new users never see them
-        # In MongoDB or In-Memory, if any patient/visit has missing worker_id, assign to DEMO_WORKER_ID
         if self.is_connected_to_mongo and self.db is not None:
             try:
                 await self.db["patients"].update_many(

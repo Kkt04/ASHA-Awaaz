@@ -43,25 +43,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const t = getTranslation(language);
 
-  const handleFillDemo = () => {
-    setEmail('kavita.asha@gov.in');
-    setPassword('AshaCare@2026');
-    setErrorMessage(null);
-  };
-
-  const handleQuickDemoLogin = async () => {
-    setEmail('kavita.asha@gov.in');
-    setPassword('AshaCare@2026');
+  const handleDemoAccess = async () => {
     setErrorMessage(null);
     setIsLoading(true);
     try {
-      const res = await authService.login({
-        email: 'kavita.asha@gov.in',
-        password: 'AshaCare@2026',
-      });
+      const res = await authService.demoLogin();
       onLoginSuccess(res.worker);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Invalid email or password.');
+      setErrorMessage(err.message || 'Unable to access demo environment.');
     } finally {
       setIsLoading(false);
     }
@@ -190,34 +179,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </div>
           )}
 
-          {/* Quick Demo Autofill Card */}
+          {/* Quick Demo Access Card */}
           <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center">
                 <Sparkles className="w-4 h-4 mr-1 text-emerald-600 dark:text-emerald-400" />
-                Demo Evaluation Account
+                Hackathon Evaluator Access
               </span>
-              <div className="flex items-center space-x-2">
-                <button
-                  type="button"
-                  onClick={handleFillDemo}
-                  className="text-xs font-semibold text-gray-700 dark:text-gray-300 hover:underline py-1 px-2.5 rounded-lg bg-emerald-100/70 dark:bg-emerald-900/40 transition-colors"
-                >
-                  Fill
-                </button>
-                <button
-                  type="button"
-                  onClick={handleQuickDemoLogin}
-                  disabled={isLoading}
-                  className="text-xs font-bold text-white bg-health-primary hover:bg-health-dark py-1 px-3 rounded-lg shadow-sm transition-colors flex items-center space-x-1"
-                >
-                  <Sparkles className="w-3 h-3 text-emerald-300" />
-                  <span>1-Click Login</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleDemoAccess}
+                disabled={isLoading}
+                className="text-xs font-bold text-white bg-health-primary hover:bg-health-dark py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center space-x-1"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
+                <span>1-Click Demo Evaluation</span>
+              </button>
             </div>
             <p className="text-xs text-emerald-800/80 dark:text-emerald-400/80">
-              {t.demoCredentialsNote}
+              Instantly explore the verified healthcare register with simulated rural cases.
             </p>
           </div>
 
@@ -241,7 +221,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="kavita.asha@gov.in"
+                  placeholder="worker@gov.in"
                   required
                   className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-gray-300 dark:border-dark-border bg-surface-warm dark:bg-dark-card text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-health-primary text-base transition-colors"
                 />
