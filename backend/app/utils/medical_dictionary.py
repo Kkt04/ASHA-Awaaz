@@ -12,18 +12,23 @@ HINDI_SYMPTOM_MAP = {
     "haath pair mein sujan": "swelling_in_limbs",
     "chehre par sujan": "facial_edema",
     "soojhan": "swelling",
+    "gor me sujan": "swelling_in_feet",
+    "god mein sujan": "swelling_in_feet",
     
     # Blood pressure / dizziness / headache
     "chakkar": "dizziness",
     "sar dard": "severe_headache",
     "sir dard": "severe_headache",
     "sir me dard": "severe_headache",
+    "math ghoomat": "dizziness",
+    "matha batha": "severe_headache",
     "dhundhla dikhna": "blurred_vision",
     "aankhon ke aage andhera": "blurred_vision",
     
     # Bleeding
     "khoon aana": "bleeding",
     "khoon girna": "bleeding",
+    "khoon giral": "bleeding",
     "bleeding hona": "bleeding",
     "raktsrav": "bleeding",
     

@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertOctagon, PhoneCall, Ambulance, AlertCircle } from 'lucide-react';
 import { RiskEvaluation, LanguageCode } from '../types';
-import { getTranslation } from '../utils/translations';
+import { getTranslation } from '../i18n';
 
 interface RiskBannerProps {
   risk: RiskEvaluation;
@@ -19,10 +19,10 @@ export const RiskBanner: React.FC<RiskBannerProps> = ({ risk, language }) => {
         </div>
         <div>
           <h4 className="font-bold text-emerald-900 text-base">
-            सामान्य स्थिति (No High-Risk Danger Signs)
+            {t.normalStatusTitle}
           </h4>
           <p className="text-xs text-emerald-800 mt-0.5">
-            प्रोटोटाइप नैदानिक नियमों के अनुसार कोई गंभीर खतरे का संकेत नहीं मिला। नियमित फॉलो-अप जारी रखें।
+            {t.normalStatusDesc}
           </p>
         </div>
       </div>
@@ -30,6 +30,12 @@ export const RiskBanner: React.FC<RiskBannerProps> = ({ risk, language }) => {
   }
 
   const anmPhone = risk.call_anm_phone || '+91 98765 43210';
+
+  const getFlagMessage = (flag: any) => {
+    if (language === 'ta') return flag.message_ta || flag.message_en;
+    if (language === 'hi' || language === 'bho') return flag.message_hi || flag.message_en;
+    return flag.message_en;
+  };
 
   return (
     <div className="bg-danger-light border-2 border-danger-primary rounded-2xl p-5 text-left space-y-4 danger-ring">
@@ -43,7 +49,7 @@ export const RiskBanner: React.FC<RiskBannerProps> = ({ risk, language }) => {
             {t.dangerTitle}
           </h3>
           <p className="text-sm font-bold text-red-900 mt-0.5">
-            {risk.emergency_action || t.dangerSub}
+            {t.dangerSub}
           </p>
         </div>
       </div>
@@ -51,7 +57,7 @@ export const RiskBanner: React.FC<RiskBannerProps> = ({ risk, language }) => {
       {/* Specific Danger Signs Triggered */}
       <div className="bg-white/80 rounded-xl p-3 border border-red-200 space-y-2">
         <div className="text-xs font-bold text-red-950 uppercase tracking-wide">
-          पहचाने गए खतरे के संकेत:
+          {t.identifiedDangerSigns}
         </div>
         <ul className="space-y-1.5">
           {risk.danger_flags.map((flag, idx) => (
@@ -60,7 +66,7 @@ export const RiskBanner: React.FC<RiskBannerProps> = ({ risk, language }) => {
               className="text-sm font-bold text-danger-deep flex items-start space-x-2"
             >
               <span className="text-red-600 font-extrabold mt-0.5">⚠️</span>
-              <span>{language === 'ta' ? flag.message_ta : flag.message_hi}</span>
+              <span>{getFlagMessage(flag)}</span>
             </li>
           ))}
         </ul>
@@ -81,16 +87,14 @@ export const RiskBanner: React.FC<RiskBannerProps> = ({ risk, language }) => {
           className="touch-target min-h-[50px] bg-red-800 hover:bg-red-900 active:scale-[0.98] transition-all text-white font-bold rounded-xl shadow-md flex items-center justify-center space-x-2 text-sm"
         >
           <Ambulance className="w-4 h-4" />
-          <span>108 एम्बुलेंस</span>
+          <span>{t.emergency108}</span>
         </a>
       </div>
 
       {/* Clinical Protocol Disclaimer */}
       <div className="flex items-center space-x-1.5 text-[11px] text-red-800 pt-1">
         <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-        <span>
-          निर्णय समर्थन प्रणाली: यह क्लिनिकल प्रोटोकॉल पर आधारित सहायता है, डॉक्टर का विकल्प नहीं।
-        </span>
+        <span>{t.disclaimer}</span>
       </div>
     </div>
   );

@@ -3,20 +3,13 @@ import {
   Search, 
   Mic, 
   Calendar, 
-  AlertTriangle, 
-  CheckCircle, 
-  Clock, 
   ChevronRight, 
   ArrowLeft,
-  User,
-  HeartPulse,
-  Activity,
-  Thermometer,
-  Scale
+  User
 } from 'lucide-react';
 import { LocalVisitRecord, LanguageCode } from '../types';
 import { db } from '../db/dexie';
-import { getTranslation } from '../utils/translations';
+import { getTranslation, formatSymptomLabel } from '../i18n';
 import { speechRecognitionManager } from '../services/speechRecognition';
 import { voiceSynthesizer } from '../services/speechSynthesis';
 
@@ -58,12 +51,21 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
     }
 
     setIsVoiceSearching(true);
-    voiceSynthesizer.speak('मरीज़ का नाम बोलिए', language, () => {
+    const searchPrompt =
+      language === 'en'
+        ? 'Please speak the patient name.'
+        : language === 'ta'
+        ? 'நோயாளி பெயரை கூறவும்.'
+        : language === 'bho'
+        ? 'मरीज के नाम बोलीं।'
+        : 'मरीज़ का नाम बोलिए।';
+
+    voiceSynthesizer.speak(searchPrompt, language, () => {
       speechRecognitionManager.start(language, {
         onTranscriptChange: (text, isFinal) => {
-          // clean "ka record dikhao"
+          // Clean common auxiliary search phrases
           const clean = text
-            .replace(/(ka\s*record\s*dikhao|ka\s*parcha|ki\s*history|dikhao|dekho)/gi, '')
+            .replace(/(ka\s*record\s*dikhao|ka\s*parcha|ki\s*history|dikhao|dekho|show\s*record\s*of|search|find)/gi, '')
             .trim();
           setSearchTerm(clean);
           if (isFinal) {
@@ -96,7 +98,13 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
   const formatDate = (isoString: string) => {
     try {
       const d = new Date(isoString);
-      return d.toLocaleDateString('hi-IN', {
+      const locale =
+        language === 'ta'
+          ? 'ta-IN'
+          : language === 'en'
+          ? 'en-IN'
+          : 'hi-IN';
+      return d.toLocaleDateString(locale, {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -118,7 +126,7 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
           className="flex items-center space-x-2 text-health-dark font-bold hover:underline touch-target"
         >
           <ArrowLeft className="w-5 h-5" />
-          <span>सूची पर वापस जाएं</span>
+          <span>{t.backToList}</span>
         </button>
 
         {/* Visit Details Card */}
@@ -129,7 +137,7 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
                 {selectedVisit.patient_name}
               </h3>
               <p className="text-xs text-gray-500">
-                विज़िट तिथि: {formatDate(selectedVisit.created_at)}
+                {t.visitDate}: {formatDate(selectedVisit.created_at)}
               </p>
             </div>
             <span
@@ -139,33 +147,33 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
                   : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
               }`}
             >
-              {isDanger ? '⚠️ खतरे का मामला' : '✓ सामान्य'}
+              {isDanger ? `⚠️ ${t.highRiskCases}` : `✓ ${t.normalStatusTitle}`}
             </span>
           </div>
 
           {/* Vitals Summary */}
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="p-2 bg-surface-warm rounded-lg border border-gray-200">
-              <span className="text-gray-500 block">बीपी:</span>
+              <span className="text-gray-500 block">{t.bloodPressure}:</span>
               <span className="font-bold text-gray-900 text-sm">
                 {vData.vitals?.blood_pressure?.systolic
                   ? `${vData.vitals.blood_pressure.systolic}/${vData.vitals.blood_pressure.diastolic}`
-                  : 'दर्ज नहीं'}
+                  : t.notRecorded}
               </span>
             </div>
             <div className="p-2 bg-surface-warm rounded-lg border border-gray-200">
-              <span className="text-gray-500 block">तापमान:</span>
+              <span className="text-gray-500 block">{t.temperature}:</span>
               <span className="font-bold text-gray-900 text-sm">
                 {vData.vitals?.temperature_f
                   ? `${vData.vitals.temperature_f}°F`
-                  : 'दर्ज नहीं'}
+                  : t.notRecorded}
               </span>
             </div>
           </div>
 
           {/* Symptoms */}
           <div className="text-xs">
-            <span className="text-gray-500 block mb-1">लक्षण:</span>
+            <span className="text-gray-500 block mb-1">{t.symptoms}:</span>
             <div className="flex flex-wrap gap-1">
               {vData.symptoms && vData.symptoms.length > 0 ? (
                 vData.symptoms.map((s, idx) => (
@@ -173,11 +181,11 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
                     key={idx}
                     className="px-2 py-0.5 bg-amber-100 text-amber-900 rounded font-semibold"
                   >
-                    {s}
+                    {formatSymptomLabel(s, language)}
                   </span>
                 ))
               ) : (
-                <span className="text-gray-600">कोई नहीं</span>
+                <span className="text-gray-600">{t.noSpecificSymptoms}</span>
               )}
             </div>
           </div>
@@ -189,7 +197,7 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
 
           {/* Sync Status */}
           <div className="pt-2 flex items-center justify-between text-xs text-gray-500">
-            <span>सिंक स्थिति:</span>
+            <span>{t.syncStatusLabel}</span>
             <span
               className={`font-bold ${
                 selectedVisit.sync_status === 'synced'
@@ -198,8 +206,8 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
               }`}
             >
               {selectedVisit.sync_status === 'synced'
-                ? '✓ क्लाउड में सहेजा गया'
-                : '⏳ सिंक बाकी (स्थानीय)'}
+                ? t.syncStatusCloud
+                : t.syncStatusPending}
             </span>
           </div>
         </div>
@@ -216,7 +224,7 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
           className="flex items-center space-x-1.5 text-health-dark font-bold hover:underline touch-target"
         >
           <ArrowLeft className="w-5 h-5" />
-          <span>होम</span>
+          <span>{t.backToHome}</span>
         </button>
         <h2 className="text-lg font-bold text-gray-900">
           {t.patientHistory} ({visits.length})
@@ -243,7 +251,7 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
               ? 'bg-red-600 text-white animate-pulse'
               : 'bg-health-mint text-health-dark hover:bg-health-mintborder'
           }`}
-          title="बोलकर खोजें"
+          title="Search by Voice"
         >
           <Mic className="w-5 h-5" />
         </button>
@@ -259,7 +267,7 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
               : 'bg-white text-gray-700 border-gray-200'
           }`}
         >
-          सभी
+          {t.allFilter}
         </button>
         <button
           onClick={() => setFilterCategory('danger')}
@@ -269,7 +277,7 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
               : 'bg-white text-red-700 border-red-200'
           }`}
         >
-          ⚠️ खतरे के मामले
+          {t.dangerFilter}
         </button>
         <button
           onClick={() => setFilterCategory('pregnant')}
@@ -279,7 +287,7 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
               : 'bg-white text-gray-700 border-gray-200'
           }`}
         >
-          गर्भवती
+          {t.pregnantFilter}
         </button>
         <button
           onClick={() => setFilterCategory('newborn')}
@@ -289,7 +297,7 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
               : 'bg-white text-gray-700 border-gray-200'
           }`}
         >
-          नवजात
+          {t.newbornFilter}
         </button>
       </div>
 
@@ -298,7 +306,7 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
         {filteredVisits.length === 0 ? (
           <div className="p-8 text-center text-gray-500 bg-white rounded-2xl border border-gray-200">
             <User className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-            <p className="font-medium text-sm">कोई रिकॉर्ड नहीं मिला।</p>
+            <p className="font-medium text-sm">{t.noRecordsFound}</p>
           </div>
         ) : (
           filteredVisits.map((v) => {

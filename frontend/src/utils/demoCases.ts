@@ -67,5 +67,16 @@ export const DEMO_CASES: DemoCase[] = [
     simulatedAudioDurationSec: 5,
     expectedRisk: 'danger',
     description: '7 மாத கர்ப்பிணி, பிபி 150/100, கால் வீக்கம் (ப்ரீக்ளாம்சியா அபாயம்).'
+  },
+  {
+    id: 'demo-sunita-bhojpuri',
+    title: 'सुनीता देवी (भोजपुरी - हाई रिस्क BP)',
+    patientName: 'सुनीता देवी',
+    category: 'pregnant_woman',
+    language: 'bho',
+    transcript: 'सुनीता, सात महीना के गर्भवती बाड़ी, बीपी 150/100 बा, गोड़ में सूजन बा आ आयरन के गोली ना लिहले बाड़ी।',
+    simulatedAudioDurationSec: 5,
+    expectedRisk: 'danger',
+    description: '7 महीना के गर्भवती, बीपी 150/100, गोड़ में सूजन (प्री-एक्लेम्पसिया खतरा).'
   }
 ];

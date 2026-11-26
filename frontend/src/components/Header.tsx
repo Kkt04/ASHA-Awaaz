@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, RefreshCw, Volume2, Globe, HeartPulse } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, HeartPulse } from 'lucide-react';
 import { LanguageCode } from '../types';
-import { getTranslation } from '../utils/translations';
+import { getTranslation } from '../i18n';
 import { syncPendingVisits } from '../services/api';
 import { db } from '../db/dexie';
-import { voiceSynthesizer } from '../services/speechSynthesis';
+import { LanguageDropdown } from './LanguageDropdown';
 
 interface HeaderProps {
   language: LanguageCode;
@@ -59,54 +59,32 @@ export const Header: React.FC<HeaderProps> = ({
     setIsSyncing(false);
   };
 
-  const handleToggleLang = () => {
-    let nextLang: LanguageCode = 'hi';
-    if (language === 'hi') nextLang = 'ta';
-    else if (language === 'ta') nextLang = 'en';
-    else nextLang = 'hi';
-
-    onLanguageChange(nextLang);
-    const msg =
-      nextLang === 'hi'
-        ? 'भाषा हिन्दी'
-        : nextLang === 'ta'
-        ? 'மொழி தமிழ்'
-        : 'Language English';
-    voiceSynthesizer.speak(msg, nextLang);
-  };
-
-  const getLangBadge = () => {
-    if (language === 'hi') return 'हिन्दी';
-    if (language === 'ta') return 'தமிழ்';
-    return 'EN';
-  };
-
   return (
-    <header className="bg-health-dark text-white px-4 py-3 shadow-md sticky top-0 z-30">
+    <header className="bg-health-dark text-white px-3.5 py-2.5 shadow-md sticky top-0 z-40">
       <div className="max-w-md mx-auto flex items-center justify-between">
         {/* Brand Logo & Name */}
         <button
           onClick={onHomeClick}
-          className="flex items-center space-x-2.5 text-left focus:outline-none touch-target"
+          className="flex items-center space-x-2 text-left focus:outline-none touch-target"
         >
-          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-health-dark shadow-sm">
-            <HeartPulse className="w-6 h-6 stroke-[2.5]" />
+          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center text-health-dark shadow-sm">
+            <HeartPulse className="w-5 h-5 stroke-[2.5]" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight leading-none text-white">
+            <h1 className="text-lg font-bold tracking-tight leading-none text-white">
               {t.appName}
             </h1>
-            <span className="text-xs text-green-200 font-medium">
+            <span className="text-[11px] text-green-200 font-medium">
               Build for Bharat
             </span>
           </div>
         </button>
 
-        {/* Status Indicators & Language Toggle */}
-        <div className="flex items-center space-x-2">
+        {/* Status Indicators & Language Dropdown */}
+        <div className="flex items-center space-x-1.5">
           {/* Network connectivity pill */}
           <div
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+            className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-semibold ${
               isOnline
                 ? 'bg-emerald-900/80 text-emerald-200 border border-emerald-600'
                 : 'bg-amber-900/80 text-amber-200 border border-amber-600'
@@ -118,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <WifiOff className="w-3.5 h-3.5 text-amber-400" />
             )}
-            <span className="hidden sm:inline">
+            <span className="hidden sm:inline text-[11px]">
               {isOnline ? t.online : 'Offline'}
             </span>
           </div>
@@ -138,15 +116,11 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Language Toggle Button */}
-          <button
-            onClick={handleToggleLang}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 active:bg-white/30 text-xs font-bold text-white border border-white/20 touch-target"
-            title="Switch Language (हिन्दी / தமிழ் / English)"
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span>{getLangBadge()}</span>
-          </button>
+          {/* Global Language Dropdown */}
+          <LanguageDropdown
+            currentLanguage={language}
+            onLanguageChange={onLanguageChange}
+          />
         </div>
       </div>
     </header>

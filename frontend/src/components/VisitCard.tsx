@@ -6,14 +6,17 @@ import {
   Scale, 
   Pill, 
   Baby, 
-  AlertCircle, 
   Sparkles,
   CheckCircle2,
-  XCircle,
-  HelpCircle
+  XCircle
 } from 'lucide-react';
 import { StructuredVisitData, LanguageCode } from '../types';
-import { getTranslation } from '../utils/translations';
+import { 
+  getTranslation, 
+  formatCategoryLabel, 
+  formatSymptomLabel, 
+  formatMedicineLabel 
+} from '../i18n';
 
 interface VisitCardProps {
   data: StructuredVisitData;
@@ -30,32 +33,6 @@ export const VisitCard: React.FC<VisitCardProps> = ({
 }) => {
   const t = getTranslation(language);
 
-  const getCategoryLabel = (cat: string) => {
-    switch (cat) {
-      case 'pregnant_woman':
-        return t.pregnantWoman;
-      case 'newborn':
-        return t.newborn;
-      case 'child':
-        return t.child;
-      default:
-        return 'सामान्य (General)';
-    }
-  };
-
-  const getSymptomLabel = (sym: string) => {
-    const map: Record<string, string> = {
-      swelling_in_feet: 'पैरों में सूजन (Swelling in feet)',
-      dizziness: 'चक्कर आना (Dizziness)',
-      bleeding: 'रक्तस्राव (Bleeding)',
-      fever: 'बुखार (Fever)',
-      severe_headache: 'तेज सिरदर्द (Severe headache)',
-      difficulty_breathing: 'सांस लेने में तकलीफ (Breathlessness)',
-      poor_feeding: 'दूध नहीं पी रहा (Poor feeding)',
-    };
-    return map[sym] || sym;
-  };
-
   const isBpHigh = Boolean(
     data.vitals?.blood_pressure?.systolic &&
     data.vitals.blood_pressure.systolic >= 140
@@ -65,18 +42,18 @@ export const VisitCard: React.FC<VisitCardProps> = ({
     <div className="bg-white rounded-2xl shadow-card border border-health-mintborder p-5 text-left space-y-4">
       {/* Top Header */}
       <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-        <div className="flex items-center space-x-2">
-          <div className="w-10 h-10 rounded-xl bg-health-mint text-health-dark flex items-center justify-center font-bold">
-            <User className="w-6 h-6 text-health-primary" />
+        <div className="flex items-center space-x-2.5">
+          <div className="w-10 h-10 rounded-xl bg-health-mint text-health-dark flex items-center justify-center font-bold flex-shrink-0">
+            <User className="w-5 h-5 text-health-primary" />
           </div>
           <div>
             <h3 className="text-xl font-bold text-gray-900 leading-tight">
               {data.patient_name || (
-                <span className="text-amber-700 italic">नाम दर्ज नहीं</span>
+                <span className="text-amber-700 italic">{t.nameNotRecorded}</span>
               )}
             </h3>
             <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-              {getCategoryLabel(data.category)}
+              {formatCategoryLabel(data.category, language)}
             </span>
           </div>
         </div>
@@ -85,7 +62,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({
         <div className="text-right">
           <span className="inline-flex items-center text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
             <Sparkles className="w-3 h-3 mr-1 text-emerald-600" />
-            {engineUsed === 'groq_llm' ? 'Groq AI' : 'Deterministic Engine'}
+            {engineUsed === 'groq_llm' ? t.engineLabelGroq : t.engineLabelDeterministic}
           </span>
         </div>
       </div>
@@ -109,7 +86,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({
           <div className="bg-surface-warm p-3 rounded-xl border border-gray-200">
             <div className="text-xs font-semibold text-gray-600 flex items-center">
               <Baby className="w-4 h-4 mr-1 text-health-primary" />
-              उम्र (दिन)
+              {t.newbornAgeDays}
             </div>
             <div className="text-lg font-bold text-gray-900 mt-1">
               {data.newborn_age_days != null ? `${data.newborn_age_days} ${t.days}` : t.notRecorded}
@@ -121,7 +98,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({
           <div className="bg-surface-warm p-3 rounded-xl border border-gray-200">
             <div className="text-xs font-semibold text-gray-600 flex items-center">
               <Baby className="w-4 h-4 mr-1 text-health-primary" />
-              उम्र (साल)
+              {t.childAgeYears}
             </div>
             <div className="text-lg font-bold text-gray-900 mt-1">
               {data.child_age_years != null ? `${data.child_age_years} ${t.years}` : t.notRecorded}
@@ -193,12 +170,12 @@ export const VisitCard: React.FC<VisitCardProps> = ({
                 key={idx}
                 className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300"
               >
-                ⚠️ {getSymptomLabel(sym)}
+                ⚠️ {formatSymptomLabel(sym, language)}
               </span>
             ))}
           </div>
         ) : (
-          <span className="text-sm text-gray-600">कोई विशेष लक्षण नहीं</span>
+          <span className="text-sm text-gray-600">{t.noSpecificSymptoms}</span>
         )}
       </div>
 
@@ -216,7 +193,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({
                 className="flex items-center justify-between text-xs font-semibold p-1.5 bg-white rounded-lg border border-gray-200"
               >
                 <span>
-                  {m.name === 'iron_tablet' ? t.ironTablet : m.name}
+                  {formatMedicineLabel(m.name, language)}
                 </span>
                 {m.status === 'missed' ? (
                   <span className="text-red-700 bg-red-100 px-2 py-0.5 rounded flex items-center">
@@ -239,7 +216,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({
 
       {/* Original Transcript audit */}
       <div className="pt-2 text-xs text-gray-500 border-t border-gray-100 italic">
-        " {data.original_transcript} "
+        "{data.original_transcript}"
       </div>
     </div>
   );

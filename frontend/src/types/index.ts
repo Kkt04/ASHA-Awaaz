@@ -1,4 +1,4 @@
-export type LanguageCode = 'hi' | 'ta' | 'en';
+export type LanguageCode = 'en' | 'hi' | 'ta' | 'bho';
 
 export interface BloodPressure {
   systolic?: number | null;

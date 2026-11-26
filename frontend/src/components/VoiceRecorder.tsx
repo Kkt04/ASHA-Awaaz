@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Square, X, AlertTriangle, Volume2, Sparkles } from 'lucide-react';
 import { LanguageCode } from '../types';
-import { getTranslation } from '../utils/translations';
+import { getTranslation } from '../i18n';
 import { speechRecognitionManager } from '../services/speechRecognition';
 import { audioMeter } from '../services/audioMeter';
 import { voiceSynthesizer } from '../services/speechSynthesis';
@@ -155,17 +155,17 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       {/* Live Transcript Display Box */}
       <div className="w-full bg-white rounded-2xl p-4 shadow-card border border-health-mintborder mb-4 min-h-[110px] flex flex-col justify-between">
         <div className="text-xs font-bold uppercase text-gray-500 mb-1 flex items-center justify-between">
-          <span>लाइव ट्रांसक्रिप्ट / Spoken Words:</span>
+          <span>{t.liveTranscriptHeader}</span>
           {transcript && (
             <span className="text-health-primary flex items-center text-[11px]">
-              <Volume2 className="w-3.5 h-3.5 mr-0.5" /> सुन रहे हैं
+              <Volume2 className="w-3.5 h-3.5 mr-0.5" /> {t.liveTranscriptListening}
             </span>
           )}
         </div>
         <p className="text-lg font-medium text-gray-900 leading-relaxed min-h-[48px]">
           {transcript || (
             <span className="text-gray-400 italic">
-              बोलना शुरू कीजिए, शब्द यहाँ दिखाई देंगे...
+              {t.liveTranscriptPlaceholder}
             </span>
           )}
         </p>
@@ -175,10 +175,10 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       {showManualFallback && (
         <div className="w-full bg-amber-50 p-3 rounded-xl border border-amber-200 mb-4 text-left text-xs">
           <p className="font-bold text-amber-900 mb-1">
-            माइक्रोफ़ोन समर्थन नहीं मिला या अनुमति नहीं है?
+            {t.noMicSupportTitle}
           </p>
           <p className="text-gray-700 mb-2">
-            नीचे दिए गए किसी भी उदाहरण पर टैप करें या डेमो मोड चलाएं:
+            {t.noMicSupportDesc}
           </p>
           <div className="space-y-1.5">
             <button
@@ -189,7 +189,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
               }
               className="w-full text-left p-2 bg-white rounded border border-amber-200 hover:bg-amber-100 font-medium text-gray-800 touch-target"
             >
-              👉 "Sunita, 7 mahine pregnant, BP 150/100, sujan, iron nahi li"
+              {t.presetPromptSample1}
             </button>
             <button
               onClick={() =>
@@ -199,7 +199,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
               }
               className="w-full text-left p-2 bg-white rounded border border-amber-200 hover:bg-amber-100 font-medium text-gray-800 touch-target"
             >
-              👉 "Aarav, 15 din navjat, bukhar 101.5, doodh nahi pee raha"
+              {t.presetPromptSample2}
             </button>
           </div>
         </div>

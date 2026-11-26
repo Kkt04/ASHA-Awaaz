@@ -62,10 +62,12 @@ class VoiceSynthesizer {
       utterance.rate = 0.95; // Clear cadence for field use
       utterance.pitch = 1.0;
 
-      let langTag = 'hi-IN';
-      if (language === 'ta') {
+      let langTag = 'en-IN';
+      if (language === 'hi' || language === 'bho') {
+        langTag = 'hi-IN';
+      } else if (language === 'ta') {
         langTag = 'ta-IN';
-      } else if (language === 'en') {
+      } else {
         langTag = 'en-IN';
       }
       utterance.lang = langTag;

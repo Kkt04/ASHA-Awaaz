@@ -3,13 +3,7 @@ import {
   Mic, 
   Sparkles, 
   CheckCircle2, 
-  Clock, 
-  AlertOctagon, 
-  UserCheck, 
-  Users, 
   ChevronRight, 
-  ArrowRight,
-  RotateCcw,
   Plus
 } from 'lucide-react';
 import { 
@@ -19,9 +13,8 @@ import {
   RiskEvaluation, 
   LocalVisitRecord 
 } from './types';
-import { getTranslation } from './utils/translations';
+import { getTranslation, generateSpokenSummaryForLang } from './i18n';
 import { Header } from './components/Header';
-import { LanguageSelector } from './components/LanguageSelector';
 import { VoiceRecorder } from './components/VoiceRecorder';
 import { VisitCard } from './components/VisitCard';
 import { RiskBanner } from './components/RiskBanner';
@@ -33,11 +26,11 @@ import { extractVisitVoice, evaluateRisk, saveVisitRecord } from './services/api
 import { voiceSynthesizer } from './services/speechSynthesis';
 
 export const App: React.FC = () => {
-  const [language, setLanguage] = useState<LanguageCode>('hi');
-  const [hasChosenLanguage, setHasChosenLanguage] = useState<boolean>(false);
+  // Default to English as requested
+  const [language, setLanguage] = useState<LanguageCode>('en');
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
   
-  // Active workflow state
+  // Active visit recording and confirmation state
   const [currentTranscript, setCurrentTranscript] = useState<string>('');
   const [structuredData, setStructuredData] = useState<StructuredVisitData | null>(null);
   const [riskEvaluation, setRiskEvaluation] = useState<RiskEvaluation | null>(null);
@@ -54,13 +47,15 @@ export const App: React.FC = () => {
   const t = getTranslation(language);
 
   useEffect(() => {
-    // Check saved language
+    // Check saved language - default strictly to 'en' on first launch
     const savedLang = localStorage.getItem('asha_language') as LanguageCode;
-    if (savedLang) {
+    if (savedLang && ['en', 'hi', 'ta', 'bho'].includes(savedLang)) {
       setLanguage(savedLang);
-      setHasChosenLanguage(true);
+    } else {
+      setLanguage('en');
+      localStorage.setItem('asha_language', 'en');
     }
-    // Initialize DB with demo seed
+    // Initialize DB with demo seeds & load metrics
     seedLocalDemoPatients().then(loadMetrics);
   }, []);
 
@@ -77,11 +72,20 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleLanguageSelect = (lang: LanguageCode) => {
-    setLanguage(lang);
-    localStorage.setItem('asha_language', lang);
-    setHasChosenLanguage(true);
-    setCurrentScreen('home');
+  /**
+   * Instant Language Switching:
+   * Translates the entire visible application without page reload,
+   * preserves current screen, visit data, and updates spoken summary dynamically.
+   */
+  const handleLanguageChange = (newLang: LanguageCode) => {
+    setLanguage(newLang);
+    localStorage.setItem('asha_language', newLang);
+
+    // If a visit record is currently under review, dynamically update its summary in the new language
+    if (structuredData) {
+      const newSummary = generateSpokenSummaryForLang(structuredData, newLang);
+      setSpokenSummary(newSummary);
+    }
   };
 
   const handleStartRecording = () => {
@@ -93,22 +97,17 @@ export const App: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      // 1. Extract health data via Groq API or deterministic fallback
+      // 1. Extract clinical information via Groq LLM or deterministic fallback
       const extractionRes = await extractVisitVoice(transcript, language);
       setStructuredData(extractionRes.extracted);
       setEngineUsed(extractionRes.engine);
 
-      // 2. Evaluate Clinical Danger Signs
+      // 2. Evaluate clinical danger rules (remains medically consistent across languages)
       const risk = await evaluateRisk(extractionRes.extracted);
       setRiskEvaluation(risk);
 
-      // 3. Generate summary text for TTS
-      const summary =
-        language === 'ta'
-          ? extractionRes.summaryTa
-          : language === 'en'
-          ? extractionRes.summaryEn
-          : extractionRes.summaryHi;
+      // 3. Generate summary in current selected language
+      const summary = generateSpokenSummaryForLang(extractionRes.extracted, language);
       setSpokenSummary(summary);
 
       // 4. Move to confirmation screen
@@ -149,26 +148,18 @@ export const App: React.FC = () => {
     setRiskEvaluation(updatedRisk);
   };
 
-  // 1. First-time Language Selector Screen
-  if (!hasChosenLanguage) {
-    return <LanguageSelector onSelectLanguage={handleLanguageSelect} />;
-  }
-
   return (
     <div className="min-h-screen bg-surface-warm flex flex-col font-sans">
-      {/* Top Header */}
+      {/* Top Header with Global Language Dropdown accessible on all screens */}
       <Header
         language={language}
-        onLanguageChange={(newLang) => {
-          setLanguage(newLang);
-          localStorage.setItem('asha_language', newLang);
-        }}
+        onLanguageChange={handleLanguageChange}
         onHomeClick={() => setCurrentScreen('home')}
       />
 
       {/* Main Screen Content */}
       <main className="flex-1 max-w-md w-full mx-auto pb-8">
-        {/* ================= Screen: HOME ================= */}
+        {/* ================= Screen: HOME DASHBOARD ================= */}
         {currentScreen === 'home' && (
           <div className="p-4 space-y-5 text-center">
             {/* Top Greeting & Demo Mode Trigger */}
@@ -177,8 +168,8 @@ export const App: React.FC = () => {
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   {t.workerGreeting}
                 </span>
-                <h2 className="text-lg font-bold text-gray-900 leading-tight">
-                  रामपुर उप-केन्द्र (कल्याणपुर)
+                <h2 className="text-base font-bold text-gray-900 leading-tight">
+                  {t.subCentreName}
                 </h2>
               </div>
 
@@ -220,7 +211,7 @@ export const App: React.FC = () => {
                   {t.patientHistory}
                 </span>
                 <span className="text-xs font-bold text-gray-800 flex items-center mt-1">
-                  देखें <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                  {t.viewAll} <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                 </span>
               </button>
             </div>
@@ -230,13 +221,13 @@ export const App: React.FC = () => {
               <button
                 onClick={handleStartRecording}
                 className="w-40 h-40 rounded-full bg-health-dark hover:bg-health-primary active:scale-95 transition-all shadow-elevated text-white flex flex-col items-center justify-center space-y-2 border-4 border-emerald-300/60 touch-target group"
-                aria-label="बोलकर विज़िट दर्ज करें"
+                aria-label={t.speakVisitButton}
               >
                 <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Mic className="w-10 h-10 stroke-[2.5]" />
                 </div>
                 <span className="text-xs font-bold uppercase tracking-wider text-green-100">
-                  टैप करें
+                  {t.tapToRecord}
                 </span>
               </button>
 
@@ -244,17 +235,17 @@ export const App: React.FC = () => {
                 {t.speakVisitButton}
               </h3>
               <p className="text-sm font-semibold text-gray-600 mt-1">
-                "विज़िट के बारे में बोलिए..."
+                {t.speakVisitSub}
               </p>
             </div>
 
             {/* Example Prompt Bubble */}
             <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3.5 text-left text-xs space-y-1">
               <span className="font-bold text-emerald-900 block">
-                💡 ऐसे बोल सकते हैं:
+                💡 {t.examplePromptTitle}
               </span>
               <p className="text-gray-700 font-medium italic">
-                "Sunita, 7 mahine ki pregnant hai, BP 150 by 100 hai, pairon mein sujan hai aur iron ki goli nahi li."
+                {t.examplePromptText}
               </p>
             </div>
 
@@ -268,14 +259,14 @@ export const App: React.FC = () => {
                   onClick={() => setCurrentScreen('history')}
                   className="text-xs text-health-primary font-bold hover:underline"
                 >
-                  सभी देखें ({totalVisits})
+                  {t.viewAll} ({totalVisits})
                 </button>
               </div>
 
               <div className="space-y-2">
                 {recentVisits.length === 0 ? (
                   <p className="text-xs text-gray-500 py-3 text-center bg-white rounded-xl border border-gray-200">
-                    अभी कोई विज़िट दर्ज नहीं है। ऊपर दिए गए माइक बटन पर टैप करें।
+                    {t.noRecentVisits}
                   </p>
                 ) : (
                   recentVisits.map((v) => {
@@ -295,7 +286,7 @@ export const App: React.FC = () => {
                             </span>
                             {isDanger && (
                               <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-red-100 text-red-800">
-                                खतरा ⚠️
+                                ⚠️ {t.highRiskCases}
                               </span>
                             )}
                           </div>
@@ -329,7 +320,7 @@ export const App: React.FC = () => {
         {/* ================= Screen: CONFIRMATION & CARD ================= */}
         {currentScreen === 'confirmation' && structuredData && (
           <div className="p-4 space-y-4">
-            {/* Clinical Risk Banner (shown prominently if high risk) */}
+            {/* Clinical Risk Banner */}
             {riskEvaluation && (
               <RiskBanner risk={riskEvaluation} language={language} />
             )}
@@ -364,7 +355,7 @@ export const App: React.FC = () => {
                 {t.recordSavedSuccess}
               </h2>
               <p className="text-sm font-semibold text-gray-600 mt-1">
-                विज़िट सुरक्षित स्थानीय रूप से IndexedDB में दर्ज हो गई है।
+                {t.recordSavedDesc}
               </p>
             </div>
 
@@ -379,14 +370,14 @@ export const App: React.FC = () => {
                 className="w-full touch-target min-h-[56px] bg-health-dark hover:bg-health-primary text-white font-extrabold rounded-2xl shadow-md flex items-center justify-center space-x-2 text-base transition-all"
               >
                 <Plus className="w-5 h-5 stroke-[3]" />
-                <span>अगली विज़िट दर्ज करें</span>
+                <span>{t.nextVisitBtn}</span>
               </button>
 
               <button
                 onClick={() => setCurrentScreen('history')}
                 className="w-full touch-target min-h-[50px] bg-white border-2 border-gray-300 hover:bg-gray-50 text-gray-800 font-bold rounded-2xl flex items-center justify-center space-x-2 text-sm transition-all"
               >
-                <span>मरीज़ों का इतिहास देखें</span>
+                <span>{t.viewHistoryBtn}</span>
               </button>
             </div>
           </div>

@@ -95,28 +95,28 @@ export function extractLocally(
 
   // 9. Symptoms
   const symptomsSet = new Set(data.symptoms || []);
-  if (/sujan|swelling|soojhan|வீக்கம்/i.test(lower)) symptomsSet.add('swelling_in_feet');
-  if (/chakkar|dizziness|தலைசுற்றல்|மயக்கம்/i.test(lower)) symptomsSet.add('dizziness');
-  if (/khoon|bleeding|ரத்தப்போக்கு/i.test(lower)) symptomsSet.add('bleeding');
-  if (/bukhar|fever|காய்ச்சல்/i.test(lower)) symptomsSet.add('fever');
-  if (/sar dard|sir dard|headache|தலைவலி/i.test(lower)) symptomsSet.add('severe_headache');
-  if (/saans|breathing|மூச்சுத்திணறல்/i.test(lower)) symptomsSet.add('difficulty_breathing');
-  if (/doodh nahi|poor feeding/i.test(lower)) symptomsSet.add('poor_feeding');
+  if (/sujan|swelling|soojhan|வீக்கம்|गोड़ में सूजन|सूजन/i.test(lower)) symptomsSet.add('swelling_in_feet');
+  if (/chakkar|dizziness|தலைசுற்றல்|மயக்கம்|माथ घूमत|माथा घूमे/i.test(lower)) symptomsSet.add('dizziness');
+  if (/khoon|bleeding|ரத்தப்போக்கு|खून गिरल|रक्तस्राव/i.test(lower)) symptomsSet.add('bleeding');
+  if (/bukhar|fever|காய்ச்சல்|तावे/i.test(lower)) symptomsSet.add('fever');
+  if (/sar dard|sir dard|headache|தலைவலி|माथ बथा|माथा में दर्द/i.test(lower)) symptomsSet.add('severe_headache');
+  if (/saans|breathing|மூச்சுத்திணறல்|सांस फूले/i.test(lower)) symptomsSet.add('difficulty_breathing');
+  if (/doodh nahi|poor feeding|दूध ना/i.test(lower)) symptomsSet.add('poor_feeding');
   data.symptoms = Array.from(symptomsSet);
 
   // 10. Baby Movement
-  if (/halchal nahi|movement nahi|band|அசைவு இல்லை/i.test(lower)) {
+  if (/halchal nahi|movement nahi|band|அசைவு இல்லை|हलचल बंद/i.test(lower)) {
     data.baby_movement = 'none';
-  } else if (/halchal kam|movement kam|அசைவு குறைவு/i.test(lower)) {
+  } else if (/halchal kam|movement kam|அசைவு குறைவு|हलचल कम/i.test(lower)) {
     data.baby_movement = 'reduced';
-  } else if (/halchal theek|movement normal|அசைவு நன்றாக/i.test(lower)) {
+  } else if (/halchal theek|movement normal|அசைவு நன்றாக|हलचल ठीक/i.test(lower)) {
     data.baby_movement = 'normal';
   }
 
   // 11. Medicines
   const meds: MedicineItem[] = [...(data.medicines || [])];
-  if (/iron|ifa|lal goli|அயர்ன்/i.test(lower)) {
-    const isMissed = /nahi li|chhut|nahi khayi|nahi liya|சாப்பிடவில்லை|இல்லை/i.test(lower);
+  if (/iron|ifa|lal goli|अயர்ன்|आयरन|लाल गोली/i.test(lower)) {
+    const isMissed = /nahi li|chhut|nahi khayi|nahi liya|சாப்பிடவில்லை|இல்லை|ना लिहले|छूट|ना खइले/i.test(lower);
     const idx = meds.findIndex(m => m.name === 'iron_tablet');
     const item: MedicineItem = { name: 'iron_tablet', status: isMissed ? 'missed' : 'taken' };
     if (idx >= 0) meds[idx] = item;

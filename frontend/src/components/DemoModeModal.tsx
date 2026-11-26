@@ -14,6 +14,7 @@ import { DEMO_CASES, DemoCase } from '../utils/demoCases';
 import { LanguageCode, StructuredVisitData, RiskEvaluation } from '../types';
 import { extractVisitVoice, evaluateRisk, saveVisitRecord } from '../services/api';
 import { voiceSynthesizer } from '../services/speechSynthesis';
+import { generateSpokenSummaryForLang } from '../i18n';
 
 interface DemoModeModalProps {
   isOpen: boolean;
@@ -48,6 +49,8 @@ export const DemoModeModal: React.FC<DemoModeModalProps> = ({
         ? 'வணக்கம், வருகை விவரங்களைப் பேசுங்கள்.'
         : demoCase.language === 'en'
         ? 'Welcome, please speak about the visit.'
+        : demoCase.language === 'bho'
+        ? 'प्रणाम, विज़िट के बारे में बोलीं।'
         : 'नमस्ते, विज़िट के बारे में बोलिए।';
 
     voiceSynthesizer.speak(initialGreeting, demoCase.language);
@@ -83,6 +86,8 @@ export const DemoModeModal: React.FC<DemoModeModalProps> = ({
           ? res.summaryTa
           : demoCase.language === 'en'
           ? res.summaryEn
+          : demoCase.language === 'bho'
+          ? generateSpokenSummaryForLang(res.extracted, 'bho')
           : res.summaryHi;
 
       voiceSynthesizer.speak(summaryToSpeak, demoCase.language, () => {
@@ -94,6 +99,8 @@ export const DemoModeModal: React.FC<DemoModeModalProps> = ({
               ? 'ஆம், சரியானது.'
               : demoCase.language === 'en'
               ? 'Yes, that is correct.'
+              : demoCase.language === 'bho'
+              ? 'हँ, एकदम सही बा।'
               : 'हाँ, सही है।';
 
           voiceSynthesizer.speak(confirmText, demoCase.language, async () => {
@@ -111,6 +118,8 @@ export const DemoModeModal: React.FC<DemoModeModalProps> = ({
                 ? 'பதிவு வெற்றிகரமாக சேமிக்கப்பட்டது.'
                 : demoCase.language === 'en'
                 ? 'Record saved successfully.'
+                : demoCase.language === 'bho'
+                ? 'रिकॉर्ड सहेज लिहल गइल बा।'
                 : 'रिकॉर्ड सेव हो गया।';
 
             voiceSynthesizer.speak(savedText, demoCase.language);

@@ -10,7 +10,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { StructuredVisitData, LanguageCode, RiskEvaluation } from '../types';
-import { getTranslation } from '../utils/translations';
+import { getTranslation } from '../i18n';
 import { voiceSynthesizer } from '../services/speechSynthesis';
 import { speechRecognitionManager } from '../services/speechRecognition';
 import { extractVisitVoice } from '../services/api';
@@ -141,16 +141,16 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
         {isSpeaking ? (
           <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-emerald-100 text-emerald-900 rounded-full text-xs font-bold animate-pulse">
             <Volume2 className="w-4 h-4 text-emerald-700" />
-            <span>रिकॉर्ड सुनाया जा रहा है...</span>
+            <span>{t.readingRecord}</span>
           </div>
         ) : isListeningForCorrection ? (
           <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-red-100 text-red-900 rounded-full text-xs font-bold">
             <span className="w-2 h-2 rounded-full bg-red-600 animate-ping" />
-            <span>पुष्टि के लिए "हाँ" बोलिए (या गलती सुधारें)</span>
+            <span>{t.listeningForReplyPrompt}</span>
           </div>
         ) : (
           <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold">
-            <span>नीचे दिए गए बटन से पुष्टि करें</span>
+            <span>{t.confirmByButtonsPrompt}</span>
           </div>
         )}
       </div>
@@ -165,7 +165,7 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
       {/* Live detected speech during confirmation */}
       {spokenReply && (
         <div className="text-xs font-medium text-emerald-800 bg-emerald-50 p-2 rounded-lg border border-emerald-200">
-          सुना गया: "{spokenReply}"
+          {t.detectedSpeech} "{spokenReply}"
         </div>
       )}
 
@@ -176,7 +176,7 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
         className="text-xs text-health-primary font-bold hover:underline flex items-center justify-center mx-auto space-x-1 touch-target"
       >
         <RotateCcw className="w-3.5 h-3.5" />
-        <span>फिर से सुनें (Re-play)</span>
+        <span>{t.replayAudio}</span>
       </button>
 
       {/* Main Action Buttons (min 48px touch targets) */}
@@ -202,33 +202,33 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
           className="w-full touch-target min-h-[48px] bg-surface-warm hover:bg-surface-muted text-gray-800 font-bold rounded-xl border border-gray-300 flex items-center justify-center space-x-2 text-sm"
         >
           <Mic className="w-4 h-4 text-health-primary" />
-          <span>बोलकर सुधारें ("Nahi, BP 140 by 90 hai")</span>
+          <span>{t.correctField}</span>
         </button>
       </div>
 
       {/* Rapid Fallback / Correction Chips */}
       <div className="pt-2 text-left border-t border-gray-100">
         <div className="text-[11px] font-bold text-gray-500 uppercase mb-2">
-          त्वरित सुधार (Quick tap):
+          {t.quickCorrectionTitle}
         </div>
         <div className="flex flex-wrap gap-1.5">
           <button
             onClick={() => handleQuickBpCorrection(140, 90)}
             className="px-2.5 py-1 text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg border border-gray-300 touch-target"
           >
-            BP 140/90
+            {t.bpMildQuick}
           </button>
           <button
             onClick={() => handleQuickBpCorrection(120, 80)}
             className="px-2.5 py-1 text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg border border-gray-300 touch-target"
           >
-            BP 120/80
+            {t.bpNormalQuick}
           </button>
           <button
             onClick={() => handleQuickBpCorrection(150, 100)}
             className="px-2.5 py-1 text-xs font-semibold bg-red-100 hover:bg-red-200 text-red-900 rounded-lg border border-red-300 touch-target"
           >
-            BP 150/100 (खतरा)
+            {t.bpHigherQuick}
           </button>
         </div>
       </div>
