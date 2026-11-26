@@ -136,7 +136,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       <div className="my-8 flex flex-col items-center justify-center relative">
         {/* Pulsing ring scales with ambient volume */}
         <div
-          className="absolute rounded-full bg-health-primary/20 pointer-events-none transition-all duration-150"
+          className="absolute rounded-full bg-health-primary/20 dark:bg-emerald-500/10 pointer-events-none transition-all duration-150"
           style={{
             width: `${140 + audioLevel * 1.2}px`,
             height: `${140 + audioLevel * 1.2}px`,
@@ -147,24 +147,24 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         >
           <Mic className="w-14 h-14" />
         </div>
-        <p className="mt-6 text-base font-semibold text-gray-700 max-w-xs text-center">
+        <p className="mt-6 text-base font-semibold text-gray-700 dark:text-dark-muted max-w-xs text-center">
           "Sunita, 7 mahine ki pregnant hai, BP 150 by 100 hai, pairon mein sujan hai..."
         </p>
       </div>
 
       {/* Live Transcript Display Box */}
-      <div className="w-full bg-white rounded-2xl p-4 shadow-card border border-health-mintborder mb-4 min-h-[110px] flex flex-col justify-between">
-        <div className="text-xs font-bold uppercase text-gray-500 mb-1 flex items-center justify-between">
+      <div className="w-full bg-white dark:bg-dark-card rounded-2xl p-4 shadow-card dark:shadow-darkcard border border-health-mintborder dark:border-dark-border mb-4 min-h-[110px] flex flex-col justify-between">
+        <div className="text-xs font-bold uppercase text-gray-500 dark:text-dark-muted mb-1 flex items-center justify-between">
           <span>{t.liveTranscriptHeader}</span>
           {transcript && (
-            <span className="text-health-primary flex items-center text-[11px]">
+            <span className="text-health-primary dark:text-emerald-400 flex items-center text-[11px]">
               <Volume2 className="w-3.5 h-3.5 mr-0.5" /> {t.liveTranscriptListening}
             </span>
           )}
         </div>
-        <p className="text-lg font-medium text-gray-900 leading-relaxed min-h-[48px]">
+        <p className="text-lg font-medium text-gray-900 dark:text-white leading-relaxed min-h-[48px]">
           {transcript || (
-            <span className="text-gray-400 italic">
+            <span className="text-gray-400 dark:text-gray-500 italic">
               {t.liveTranscriptPlaceholder}
             </span>
           )}

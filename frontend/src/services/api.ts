@@ -69,11 +69,18 @@ export async function saveVisitRecord(
   structuredData: StructuredVisitData,
   riskEval: RiskEvaluation,
   transcript: string,
-  language: LanguageCode
+  language: LanguageCode,
+  existingCaseId?: string
 ): Promise<LocalVisitRecord> {
-  const visitId = `VISIT_${Date.now()}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+  const visitId = existingCaseId || `VISIT_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
   const now = new Date().toISOString();
   const patientName = structuredData.patient_name || 'मरीज़';
+
+  // 1. Check if record with this visit_id already exists in IndexedDB (IDEMPOTENCY)
+  const existingLocal = await db.visits.where('visit_id').equals(visitId).first();
+
+  let localId: number;
+  let isUpdate = false;
 
   const record: LocalVisitRecord = {
     visit_id: visitId,
@@ -83,20 +90,36 @@ export async function saveVisitRecord(
     language,
     structured_data: structuredData,
     risk_evaluation: riskEval,
-    sync_status: 'pending',
-    created_at: now,
+    sync_status: existingLocal ? existingLocal.sync_status : 'pending',
+    created_at: existingLocal ? existingLocal.created_at : now,
     updated_at: now,
   };
 
-  // 1. Always save in IndexedDB first (guarantees zero data loss in field)
-  const localId = await db.visits.add(record);
-  record.id = localId;
+  if (existingLocal && existingLocal.id) {
+    // UPDATE existing record in Dexie without creating a duplicate!
+    isUpdate = true;
+    localId = existingLocal.id;
+    record.id = localId;
+    await db.visits.update(localId, {
+      patient_name: patientName,
+      original_transcript: transcript,
+      language,
+      structured_data: structuredData,
+      risk_evaluation: riskEval,
+      updated_at: now,
+    });
+  } else {
+    // Insert brand new record in Dexie exactly once
+    localId = await db.visits.add(record);
+    record.id = localId;
+  }
 
   // 2. Also update or create local patient record in Dexie
   const existingPatient = await db.patients.where('name').equalsIgnoreCase(patientName).first();
   if (existingPatient && existingPatient.id) {
+    const newTotal = isUpdate ? existingPatient.total_visits : (existingPatient.total_visits || 0) + 1;
     await db.patients.update(existingPatient.id, {
-      total_visits: (existingPatient.total_visits || 0) + 1,
+      total_visits: newTotal,
       latest_risk_status: riskEval.is_high_risk ? 'danger' : existingPatient.latest_risk_status,
       updated_at: now,
     });
@@ -134,11 +157,17 @@ export async function saveVisitRecord(
   return record;
 }
 
-export async function syncPendingVisits(): Promise<{ synced: number; skipped: number; total: number }> {
-  const pending = await db.visits.where('sync_status').equals('pending').toArray();
-  if (pending.length === 0) return { synced: 0, skipped: 0, total: 0 };
+let isSyncInProgress = false;
 
+export async function syncPendingVisits(): Promise<{ synced: number; skipped: number; total: number }> {
+  if (isSyncInProgress) {
+    return { synced: 0, skipped: 0, total: 0 };
+  }
+  isSyncInProgress = true;
   try {
+    const pending = await db.visits.where('sync_status').equals('pending').toArray();
+    if (pending.length === 0) return { synced: 0, skipped: 0, total: 0 };
+
     const res = await fetch(`${API_BASE}/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -161,7 +190,9 @@ export async function syncPendingVisits(): Promise<{ synced: number; skipped: nu
     }
   } catch (err) {
     console.warn('Sync failed due to network:', err);
+  } finally {
+    isSyncInProgress = false;
   }
 
-  return { synced: 0, skipped: 0, total: pending.length };
+  return { synced: 0, skipped: 0, total: 0 };
 }

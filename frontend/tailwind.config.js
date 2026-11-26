@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -20,6 +21,14 @@ export default {
           muted: '#F0ECE4',      // Soft warm grey/beige
           dark: '#1C2826',       // High contrast dark charcoal
         },
+        dark: {
+          bg: '#0A150F',         // Deep forest night background
+          surface: '#112219',    // Slightly elevated dark surface
+          card: '#162C21',       // High contrast card surface
+          border: '#234937',     // Minty dark border
+          text: '#F1F5F3',       // Crisp high contrast light text
+          muted: '#9CB3A6',      // Readable secondary text
+        },
         danger: {
           deep: '#B71C1C',       // High alert danger
           primary: '#D32F2F',    // Red warning
@@ -37,6 +46,7 @@ export default {
       boxShadow: {
         card: '0 2px 8px -2px rgba(0, 0, 0, 0.08), 0 1px 4px -1px rgba(0, 0, 0, 0.04)',
         elevated: '0 10px 25px -5px rgba(27, 94, 32, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+        darkcard: '0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.3)',
       }
     },
   },

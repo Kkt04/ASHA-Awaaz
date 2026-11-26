@@ -84,6 +84,9 @@ export interface LocalPatientRecord {
 }
 
 export type AppScreen = 
+  | 'landing'
+  | 'login'
+  | 'signup'
   | 'language_select'
   | 'home'
   | 'recording'

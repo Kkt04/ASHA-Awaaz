@@ -155,3 +155,323 @@ async def test_worker_profile():
         resp = await ac.get("/api/v1/worker/me")
         assert resp.status_code == 200
         assert resp.json()["worker_id"] == "ASHA_WORKER_001"
+
+
+@pytest.mark.asyncio
+async def test_auth_flow_signup_login():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # 1. Signup new worker
+        signup_payload = {
+            "name": "Pooja Verma",
+            "email": "pooja.asha@gov.in",
+            "password": "SecurePassword123",
+            "role": "ASHA Health Worker",
+            "village": "Rampur Ward 5",
+            "preferred_language": "hi",
+            "phone": "+91 98111 22233"
+        }
+        signup_resp = await ac.post("/api/v1/auth/signup", json=signup_payload)
+        assert signup_resp.status_code == 201
+        signup_data = signup_resp.json()
+        assert "access_token" in signup_data
+        assert signup_data["worker"]["name"] == "Pooja Verma"
+        token = signup_data["access_token"]
+
+        # 2. Duplicate signup should fail
+        dup_resp = await ac.post("/api/v1/auth/signup", json=signup_payload)
+        assert dup_resp.status_code == 400
+
+        # 3. Login with correct credentials
+        login_resp = await ac.post("/api/v1/auth/login", json={
+            "email": "pooja.asha@gov.in",
+            "password": "SecurePassword123"
+        })
+        assert login_resp.status_code == 200
+        login_data = login_resp.json()
+        assert "access_token" in login_data
+        assert login_data["worker"]["email"] == "pooja.asha@gov.in"
+
+        # 4. Login with invalid password should return 401
+        wrong_pwd_resp = await ac.post("/api/v1/auth/login", json={
+            "email": "pooja.asha@gov.in",
+            "password": "WrongPassword!"
+        })
+        assert wrong_pwd_resp.status_code == 401
+
+        # 5. Access /worker/me with Bearer token
+        me_resp = await ac.get("/api/v1/worker/me", headers={"Authorization": f"Bearer {token}"})
+        assert me_resp.status_code == 200
+        assert me_resp.json()["name"] == "Pooja Verma"
+
+        # 6. Logout
+        logout_resp = await ac.post("/api/v1/auth/logout")
+        assert logout_resp.status_code == 200
+        assert logout_resp.json()["status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_scenarios_normal_danger_warning_each_saved_exactly_once():
+    """
+    Acceptance Criteria Test:
+    Every patient visit/case must be recorded and saved exactly once,
+    regardless of its risk category:
+    1. Normal case -> Save exactly 1 database record
+    2. Dangerous/high-risk case -> Save exactly 1 database record
+    3. Warning/moderate-risk case -> Save exactly 1 database record
+    Risk detection must only determine risk status, NOT create additional records.
+    """
+    visits_col = db_manager.get_collection("visits")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # Scenario 1: Normal Case (Child routine checkup)
+        normal_case = {
+            "visit_id": "CASE_NORMAL_001",
+            "patient_name": "Meena Kumari",
+            "worker_id": "ASHA_WORKER_001",
+            "original_transcript": "Meena 3 years child, weight 14kg, normal checkup",
+            "language": "en",
+            "structured_data": {
+                "patient_name": "Meena Kumari",
+                "category": "child",
+                "child_age_years": 3,
+                "vitals": {"weight_kg": 14},
+                "symptoms": [],
+                "medicines": [],
+                "missing_fields": [],
+                "uncertain_fields": [],
+                "original_transcript": "Meena 3 years child, weight 14kg, normal checkup"
+            }
+        }
+        res_normal = await ac.post("/api/v1/visits", json=normal_case)
+        assert res_normal.status_code == 200
+        normal_doc = res_normal.json()
+        assert normal_doc["visit_id"] == "CASE_NORMAL_001"
+        assert normal_doc["risk_evaluation"]["is_high_risk"] is False
+        # Verify exactly 1 database record exists
+        count_normal = await visits_col.count_documents({"visit_id": "CASE_NORMAL_001"})
+        assert count_normal == 1
+
+        # Scenario 2: Dangerous/High-Risk Case (Preeclampsia: high BP + swelling)
+        danger_case = {
+            "visit_id": "CASE_DANGER_001",
+            "patient_name": "Sunita Devi",
+            "worker_id": "ASHA_WORKER_001",
+            "original_transcript": "Sunita 7 months pregnant, BP 160/110, severe swelling",
+            "language": "en",
+            "structured_data": {
+                "patient_name": "Sunita Devi",
+                "category": "pregnant_woman",
+                "pregnancy_month": 7,
+                "vitals": {
+                    "blood_pressure": {"systolic": 160, "diastolic": 110}
+                },
+                "symptoms": ["swelling_feet"],
+                "medicines": [],
+                "missing_fields": [],
+                "uncertain_fields": [],
+                "original_transcript": "Sunita 7 months pregnant, BP 160/110, severe swelling"
+            }
+        }
+        res_danger = await ac.post("/api/v1/visits", json=danger_case)
+        assert res_danger.status_code == 200
+        danger_doc = res_danger.json()
+        assert danger_doc["visit_id"] == "CASE_DANGER_001"
+        assert danger_doc["risk_evaluation"]["is_high_risk"] is True
+        # Verify exactly 1 database record exists, NOT multiple
+        count_danger = await visits_col.count_documents({"visit_id": "CASE_DANGER_001"})
+        assert count_danger == 1
+
+        # Scenario 3: Warning/Moderate-Risk Case (Missed IFA iron tablet)
+        warning_case = {
+            "visit_id": "CASE_WARNING_001",
+            "patient_name": "Rani Devi",
+            "worker_id": "ASHA_WORKER_001",
+            "original_transcript": "Rani 4 months pregnant, missed iron tablet",
+            "language": "en",
+            "structured_data": {
+                "patient_name": "Rani Devi",
+                "category": "pregnant_woman",
+                "pregnancy_month": 4,
+                "vitals": {
+                    "blood_pressure": {"systolic": 118, "diastolic": 76}
+                },
+                "symptoms": [],
+                "medicines": [
+                    {"name": "iron_tablet", "status": "missed"}
+                ],
+                "missing_fields": [],
+                "uncertain_fields": [],
+                "original_transcript": "Rani 4 months pregnant, missed iron tablet"
+            }
+        }
+        res_warning = await ac.post("/api/v1/visits", json=warning_case)
+        assert res_warning.status_code == 200
+        warning_doc = res_warning.json()
+        assert warning_doc["visit_id"] == "CASE_WARNING_001"
+        # Verify exactly 1 database record exists
+        count_warning = await visits_col.count_documents({"visit_id": "CASE_WARNING_001"})
+        assert count_warning == 1
+
+
+@pytest.mark.asyncio
+async def test_repeated_and_double_click_requests_idempotency():
+    """
+    Simulates rapid double-clicking of the Save button or multiple concurrent requests.
+    Verify that 3 consecutive POST requests with the same visit_id:
+    - Return 200 OK
+    - Result in EXACTLY 1 database record in the collection
+    """
+    visits_col = db_manager.get_collection("visits")
+    patients_col = db_manager.get_collection("patients")
+
+    case_payload = {
+        "visit_id": "CASE_DOUBLE_CLICK_001",
+        "patient_name": "Pooja Sharma",
+        "worker_id": "ASHA_WORKER_001",
+        "original_transcript": "Pooja Sharma routine checkup",
+        "language": "hi",
+        "structured_data": {
+            "patient_name": "Pooja Sharma",
+            "category": "pregnant_woman",
+            "pregnancy_month": 6,
+            "vitals": {"blood_pressure": {"systolic": 120, "diastolic": 80}},
+            "symptoms": [],
+            "medicines": [],
+            "missing_fields": [],
+            "uncertain_fields": [],
+            "original_transcript": "Pooja Sharma routine checkup"
+        }
+    }
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # 1st click
+        r1 = await ac.post("/api/v1/visits", json=case_payload)
+        # 2nd click (double-click)
+        r2 = await ac.post("/api/v1/visits", json=case_payload)
+        # 3rd click (network retry)
+        r3 = await ac.post("/api/v1/visits", json=case_payload)
+
+        assert r1.status_code == 200
+        assert r2.status_code == 200
+        assert r3.status_code == 200
+
+        # Exact 1 record in database
+        records_count = await visits_col.count_documents({"visit_id": "CASE_DOUBLE_CLICK_001"})
+        assert records_count == 1
+
+        # Patient total_visits is incremented only once
+        patient = await patients_col.find_one({"name": "Pooja Sharma", "worker_id": "ASHA_WORKER_001"})
+        assert patient["total_visits"] == 1
+
+
+@pytest.mark.asyncio
+async def test_editing_already_saved_case_updates_without_duplicate():
+    """
+    If a case is edited or corrected, it updates the existing record
+    instead of inserting a new one.
+    """
+    visits_col = db_manager.get_collection("visits")
+
+    initial_case = {
+        "visit_id": "CASE_EDIT_001",
+        "patient_name": "Geeta Devi",
+        "worker_id": "ASHA_WORKER_001",
+        "original_transcript": "Geeta Devi, BP 150/100",
+        "language": "hi",
+        "structured_data": {
+            "patient_name": "Geeta Devi",
+            "category": "pregnant_woman",
+            "pregnancy_month": 5,
+            "vitals": {"blood_pressure": {"systolic": 150, "diastolic": 100}},
+            "symptoms": [],
+            "medicines": [],
+            "missing_fields": [],
+            "uncertain_fields": [],
+            "original_transcript": "Geeta Devi, BP 150/100"
+        }
+    }
+
+    corrected_case = {
+        "visit_id": "CASE_EDIT_001",
+        "patient_name": "Geeta Devi",
+        "worker_id": "ASHA_WORKER_001",
+        "original_transcript": "Geeta Devi, BP corrected to 120/80",
+        "language": "hi",
+        "structured_data": {
+            "patient_name": "Geeta Devi",
+            "category": "pregnant_woman",
+            "pregnancy_month": 5,
+            "vitals": {"blood_pressure": {"systolic": 120, "diastolic": 80}},
+            "symptoms": [],
+            "medicines": [],
+            "missing_fields": [],
+            "uncertain_fields": [],
+            "original_transcript": "Geeta Devi, BP corrected to 120/80"
+        }
+    }
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # Save initial
+        r_init = await ac.post("/api/v1/visits", json=initial_case)
+        assert r_init.status_code == 200
+        assert r_init.json()["risk_evaluation"]["is_high_risk"] is True
+
+        # Save corrected version with same visit_id
+        r_corr = await ac.post("/api/v1/visits", json=corrected_case)
+        assert r_corr.status_code == 200
+        assert r_corr.json()["risk_evaluation"]["is_high_risk"] is False
+        assert r_corr.json()["structured_data"]["vitals"]["blood_pressure"]["systolic"] == 120
+
+        # Verify exactly 1 database record
+        count = await visits_col.count_documents({"visit_id": "CASE_EDIT_001"})
+        assert count == 1
+
+
+@pytest.mark.asyncio
+async def test_offline_save_followed_by_online_sync():
+    """
+    Offline saving followed by online sync does not create duplicate records.
+    """
+    visits_col = db_manager.get_collection("visits")
+
+    offline_visit = {
+        "visit_id": "CASE_OFFLINE_SYNC_001",
+        "patient_name": "Sarita Kumari",
+        "worker_id": "ASHA_WORKER_001",
+        "original_transcript": "Sarita Kumari offline visit",
+        "language": "hi",
+        "structured_data": {
+            "patient_name": "Sarita Kumari",
+            "category": "pregnant_woman",
+            "pregnancy_month": 8,
+            "vitals": {},
+            "symptoms": [],
+            "medicines": [],
+            "missing_fields": [],
+            "uncertain_fields": [],
+            "original_transcript": "Sarita Kumari offline visit"
+        }
+    }
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # 1. First sync or direct save
+        resp1 = await ac.post("/api/v1/visits", json=offline_visit)
+        assert resp1.status_code == 200
+
+        # 2. Subsequent background sync payload containing the same visit
+        sync_payload = {
+            "visits": [offline_visit],
+            "worker_id": "ASHA_WORKER_001"
+        }
+        resp_sync = await ac.post("/api/v1/sync", json=sync_payload)
+        assert resp_sync.status_code == 200
+        sync_data = resp_sync.json()
+        assert sync_data["duplicates_skipped"] == 1
+        assert sync_data["synced_count"] == 0
+        assert "CASE_OFFLINE_SYNC_001" in sync_data["synced_ids"]
+
+        # 3. Exactly 1 record in database
+        count = await visits_col.count_documents({"visit_id": "CASE_OFFLINE_SYNC_001"})
+        assert count == 1
+
+

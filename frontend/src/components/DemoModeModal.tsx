@@ -33,6 +33,8 @@ export const DemoModeModal: React.FC<DemoModeModalProps> = ({
   const [displayedTranscript, setDisplayedTranscript] = useState<string>('');
   const [extractedData, setExtractedData] = useState<StructuredVisitData | null>(null);
   const [riskEval, setRiskEval] = useState<RiskEvaluation | null>(null);
+  const hasSavedDemoRef = React.useRef<boolean>(false);
+  const currentDemoCaseIdRef = React.useRef<string>('');
 
   if (!isOpen) return null;
 
@@ -42,6 +44,8 @@ export const DemoModeModal: React.FC<DemoModeModalProps> = ({
     setDisplayedTranscript('');
     setExtractedData(null);
     setRiskEval(null);
+    hasSavedDemoRef.current = false;
+    currentDemoCaseIdRef.current = `CASE_DEMO_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
     // Speak initial prompt
     const initialGreeting =
@@ -104,13 +108,17 @@ export const DemoModeModal: React.FC<DemoModeModalProps> = ({
               : 'हाँ, सही है।';
 
           voiceSynthesizer.speak(confirmText, demoCase.language, async () => {
-            // Step 5: Save record
+            // Step 5: Save record exactly once
+            if (hasSavedDemoRef.current) return;
+            hasSavedDemoRef.current = true;
+
             setCurrentStep(5);
             const saved = await saveVisitRecord(
               res.extracted,
               risk,
               demoCase.transcript,
-              demoCase.language
+              demoCase.language,
+              currentDemoCaseIdRef.current
             );
 
             const savedText =

@@ -148,8 +148,13 @@ class DatabaseManager:
             "_id": "WORKER_001",
             "worker_id": "ASHA_WORKER_001",
             "name": "Kavita Sharma",
-            "village": "Rampur",
-            "preferred_language": "hi",
+            "email": "kavita.asha@gov.in",
+            "password_hash": "1952f9a02dfc6d05ff1b655de7e238f83cf3d9fd520c8ea556544ed614b048f3",
+            "salt": "asha_salt_2026",
+            "role": "ASHA Health Worker",
+            "village": "Rampur (Sub-Centre Kalyanpur)",
+            "phone": "+91 98765 12345",
+            "preferred_language": "en",
             "created_at": now
         }
 

@@ -21,6 +21,7 @@ interface VoiceConfirmationProps {
   language: LanguageCode;
   onConfirm: () => void;
   onCorrectionMade: (updatedData: StructuredVisitData, newSummary: string) => void;
+  isSaving?: boolean;
 }
 
 export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
@@ -29,22 +30,34 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
   language,
   onConfirm,
   onCorrectionMade,
+  isSaving = false,
 }) => {
   const [isSpeaking, setIsSpeaking] = useState<boolean>(true);
   const [isListeningForCorrection, setIsListeningForCorrection] = useState<boolean>(false);
   const [spokenReply, setSpokenReply] = useState<string>('');
   const [isProcessingCorrection, setIsProcessingCorrection] = useState<boolean>(false);
   const [promptCount, setPromptCount] = useState<number>(0);
+  const hasTriggeredConfirmRef = React.useRef<boolean>(false);
   const t = getTranslation(language);
 
   useEffect(() => {
     // Read aloud the summary text
+    hasTriggeredConfirmRef.current = false;
     readSummaryAloud();
     return () => {
       voiceSynthesizer.stop();
       speechRecognitionManager.stop();
     };
   }, [summaryText]);
+
+  const handleConfirmAction = () => {
+    if (hasTriggeredConfirmRef.current || isSaving) return;
+    hasTriggeredConfirmRef.current = true;
+    voiceSynthesizer.stop();
+    speechRecognitionManager.stop();
+    setIsListeningForCorrection(false);
+    onConfirm();
+  };
 
   const readSummaryAloud = () => {
     setIsSpeaking(true);
@@ -56,7 +69,7 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
   };
 
   const startListeningForReply = () => {
-    if (!speechRecognitionManager.isSupported()) return;
+    if (!speechRecognitionManager.isSupported() || hasTriggeredConfirmRef.current || isSaving) return;
     setIsListeningForCorrection(true);
 
     speechRecognitionManager.start(language, {
@@ -81,14 +94,13 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
           lower === 'ஆம்' ||
           lower === 'சரி'
         ) {
-          speechRecognitionManager.stop();
-          setIsListeningForCorrection(false);
-          onConfirm();
+          handleConfirmAction();
           return;
         }
 
         // If user said "Nahi..." or a correction phrase and finished speaking
         if (isFinal && lower.length > 2) {
+          hasTriggeredConfirmRef.current = false;
           handleVoiceCorrection(text);
         }
       },
@@ -182,16 +194,28 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
       {/* Main Action Buttons (min 48px touch targets) */}
       <div className="space-y-3 pt-2">
         <button
-          onClick={onConfirm}
-          className="w-full touch-target min-h-[56px] bg-health-dark hover:bg-health-primary active:scale-[0.98] transition-all text-white font-extrabold rounded-2xl shadow-elevated flex items-center justify-center space-x-2 text-lg"
+          onClick={handleConfirmAction}
+          disabled={isSaving || isProcessingCorrection}
+          className="w-full touch-target min-h-[56px] bg-health-dark hover:bg-health-primary active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all text-white font-extrabold rounded-2xl shadow-elevated flex items-center justify-center space-x-2 text-lg"
         >
-          <Check className="w-6 h-6 stroke-[3]" />
-          <span>{t.confirmYes}</span>
+          {isSaving ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+              <span>Saving Case...</span>
+            </>
+          ) : (
+            <>
+              <Check className="w-6 h-6 stroke-[3]" />
+              <span>{t.confirmYes}</span>
+            </>
+          )}
         </button>
 
         {/* Voice Correction trigger */}
         <button
+          disabled={isSaving}
           onClick={() => {
+            hasTriggeredConfirmRef.current = false;
             if (isListeningForCorrection) {
               speechRecognitionManager.stop();
               setIsListeningForCorrection(false);
@@ -199,7 +223,7 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
               startListeningForReply();
             }
           }}
-          className="w-full touch-target min-h-[48px] bg-surface-warm hover:bg-surface-muted text-gray-800 font-bold rounded-xl border border-gray-300 flex items-center justify-center space-x-2 text-sm"
+          className="w-full touch-target min-h-[48px] bg-surface-warm hover:bg-surface-muted disabled:opacity-50 text-gray-800 font-bold rounded-xl border border-gray-300 flex items-center justify-center space-x-2 text-sm"
         >
           <Mic className="w-4 h-4 text-health-primary" />
           <span>{t.correctField}</span>

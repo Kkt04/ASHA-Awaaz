@@ -10,6 +10,17 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html.dark {
+  color: #F1F5F3;
+  background-color: #0A150F;
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #0A150F;
+  color: #F1F5F3;
+}
+
 /* Minimum 48px touch targets for accessibility & rural field use */
 .touch-target {
   min-height: 48px;

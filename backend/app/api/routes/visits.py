@@ -20,6 +20,28 @@ async def create_visit(visit_in: VisitCreate):
     # Check if this visit_id already exists (idempotency check)
     existing_visit = await visits_col.find_one({"visit_id": visit_id})
     if existing_visit:
+        # Idempotent update: update record and risk status without duplicate insertion or visit count inflation
+        risk_eval = visit_in.risk_evaluation or clinical_risk_engine.evaluate(visit_in.structured_data)
+        now = datetime.now(timezone.utc)
+        update_data = {
+            "patient_name": visit_in.patient_name.strip(),
+            "original_transcript": visit_in.original_transcript,
+            "language": visit_in.language,
+            "structured_data": visit_in.structured_data.model_dump(),
+            "risk_evaluation": risk_eval.model_dump() if risk_eval else None,
+            "updated_at": now
+        }
+        await visits_col.update_one({"visit_id": visit_id}, {"$set": update_data})
+        existing_visit.update(update_data)
+
+        # Update patient's latest risk status without incrementing total_visits
+        patient_id = existing_visit.get("patient_id")
+        if patient_id:
+            new_risk = "danger" if (risk_eval and risk_eval.is_high_risk) else "normal"
+            await patients_col.update_one(
+                {"patient_id": patient_id},
+                {"$set": {"latest_risk_status": new_risk, "updated_at": now}}
+            )
         return VisitResponse(**existing_visit)
 
     # Evaluate risk if not provided
