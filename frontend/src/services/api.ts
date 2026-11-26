@@ -7,8 +7,18 @@ import {
 import { extractLocally, generateSpokenSummaries } from './fallbackExtractor';
 import { evaluateRiskLocally } from './riskEngine';
 import { db } from '../db/dexie';
+import { API_BASE, authService } from './auth';
 
-const API_BASE = '/api/v1';
+export function getAuthHeaders(): Record<string, string> {
+  const token = authService.getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 export async function extractVisitVoice(
   transcript: string,
@@ -18,7 +28,7 @@ export async function extractVisitVoice(
   try {
     const res = await fetch(`${API_BASE}/extract`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ transcript, language }),
     });
 
@@ -52,7 +62,7 @@ export async function evaluateRisk(data: StructuredVisitData): Promise<RiskEvalu
   try {
     const res = await fetch(`${API_BASE}/risk-check`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     if (res.ok) {
@@ -70,11 +80,16 @@ export async function saveVisitRecord(
   riskEval: RiskEvaluation,
   transcript: string,
   language: LanguageCode,
-  existingCaseId?: string
+  existingCaseId?: string,
+  overrideWorkerId?: string
 ): Promise<LocalVisitRecord> {
   const visitId = existingCaseId || `VISIT_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
   const now = new Date().toISOString();
   const patientName = structuredData.patient_name || 'मरीज़';
+
+  // Derive worker ownership from active session
+  const currentUser = authService.getUser();
+  const workerId = overrideWorkerId || currentUser?.worker_id || 'ASHA_WORKER_001';
 
   // 1. Check if record with this visit_id already exists in IndexedDB (IDEMPOTENCY)
   const existingLocal = await db.visits.where('visit_id').equals(visitId).first();
@@ -85,7 +100,7 @@ export async function saveVisitRecord(
   const record: LocalVisitRecord = {
     visit_id: visitId,
     patient_name: patientName,
-    worker_id: 'ASHA_WORKER_001',
+    worker_id: workerId,
     original_transcript: transcript,
     language,
     structured_data: structuredData,
@@ -96,12 +111,13 @@ export async function saveVisitRecord(
   };
 
   if (existingLocal && existingLocal.id) {
-    // UPDATE existing record in Dexie without creating a duplicate!
+    // UPDATE existing record in Dexie without creating a duplicate
     isUpdate = true;
     localId = existingLocal.id;
     record.id = localId;
     await db.visits.update(localId, {
       patient_name: patientName,
+      worker_id: workerId,
       original_transcript: transcript,
       language,
       structured_data: structuredData,
@@ -114,8 +130,13 @@ export async function saveVisitRecord(
     record.id = localId;
   }
 
-  // 2. Also update or create local patient record in Dexie
-  const existingPatient = await db.patients.where('name').equalsIgnoreCase(patientName).first();
+  // 2. Also update or create isolated patient record in Dexie scoped to this worker
+  const existingPatient = await db.patients
+    .where('worker_id')
+    .equals(workerId)
+    .filter((p) => p.name.trim().toLowerCase() === patientName.trim().toLowerCase())
+    .first();
+
   if (existingPatient && existingPatient.id) {
     const newTotal = isUpdate ? existingPatient.total_visits : (existingPatient.total_visits || 0) + 1;
     await db.patients.update(existingPatient.id, {
@@ -126,10 +147,10 @@ export async function saveVisitRecord(
   } else {
     await db.patients.add({
       patient_id: `PAT_${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-      worker_id: 'ASHA_WORKER_001',
+      worker_id: workerId,
       name: patientName,
       category: structuredData.category || 'pregnant_woman',
-      village: 'Rampur',
+      village: currentUser?.village || 'Rampur',
       total_visits: 1,
       latest_risk_status: riskEval.is_high_risk ? 'danger' : 'normal',
       created_at: now,
@@ -137,12 +158,12 @@ export async function saveVisitRecord(
     });
   }
 
-  // 3. Attempt cloud synchronization if online
+  // 3. Attempt cloud synchronization if online with authenticated token
   if (navigator.onLine) {
     try {
       const res = await fetch(`${API_BASE}/visits`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(record),
       });
       if (res.ok) {
@@ -164,16 +185,26 @@ export async function syncPendingVisits(): Promise<{ synced: number; skipped: nu
     return { synced: 0, skipped: 0, total: 0 };
   }
   isSyncInProgress = true;
+
   try {
-    const pending = await db.visits.where('sync_status').equals('pending').toArray();
+    const currentUser = authService.getUser();
+    const workerId = currentUser?.worker_id || 'ASHA_WORKER_001';
+
+    // Only sync pending visits belonging to the currently logged in worker
+    const pending = await db.visits
+      .where('sync_status')
+      .equals('pending')
+      .filter((v) => v.worker_id === workerId)
+      .toArray();
+
     if (pending.length === 0) return { synced: 0, skipped: 0, total: 0 };
 
     const res = await fetch(`${API_BASE}/sync`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         visits: pending,
-        worker_id: 'ASHA_WORKER_001',
+        worker_id: workerId,
       }),
     });
 

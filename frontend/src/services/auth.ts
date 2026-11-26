@@ -1,4 +1,9 @@
-const API_BASE = '/api/v1';
+const rawApiBase: string = (import.meta as any).env?.VITE_API_BASE_URL || '/api/v1';
+export const API_BASE = rawApiBase.endsWith('/api/v1') 
+  ? rawApiBase 
+  : rawApiBase.endsWith('/') 
+    ? `${rawApiBase}api/v1` 
+    : `${rawApiBase}/api/v1`;
 
 export interface WorkerUser {
   worker_id: string;
@@ -50,7 +55,8 @@ export const authService = {
   },
 
   isAuthenticated(): boolean {
-    return !!this.getToken();
+    const token = this.getToken();
+    return !!token;
   },
 
   setSession(token: string, user: WorkerUser) {
@@ -68,7 +74,10 @@ export const authService = {
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          email: payload.email.trim(),
+          password: payload.password
+        }),
       });
 
       const data = await res.json();
@@ -90,7 +99,10 @@ export const authService = {
       const res = await fetch(`${API_BASE}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          email: payload.email.trim()
+        }),
       });
 
       const data = await res.json();
@@ -107,36 +119,28 @@ export const authService = {
     }
   },
 
-  async fetchProfile(): Promise<WorkerUser> {
+  async fetchProfile(): Promise<WorkerUser | null> {
     const token = this.getToken();
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    if (!token) return null;
 
     try {
-      const res = await fetch(`${API_BASE}/worker/me`, { headers });
+      const res = await fetch(`${API_BASE}/worker/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       if (res.ok) {
         const user = await res.json();
         localStorage.setItem(USER_KEY, JSON.stringify(user));
         return user;
+      } else if (res.status === 401) {
+        // Token has expired or is invalid
+        this.clearSession();
+        return null;
       }
     } catch (err) {
       console.warn('Could not refresh remote profile, using cached user:', err);
     }
 
-    const fallback = this.getUser();
-    if (fallback) return fallback;
-
-    return {
-      worker_id: 'ASHA_WORKER_001',
-      name: 'Kavita Sharma',
-      email: 'kavita.asha@gov.in',
-      role: 'ASHA Health Worker',
-      village: 'Rampur (Sub-Centre Kalyanpur)',
-      preferred_language: 'en',
-      phone: '+91 98765 12345'
-    };
+    return this.getUser();
   },
 
   async logout(): Promise<void> {
@@ -152,7 +156,6 @@ export const authService = {
       // offline safe
     } finally {
       this.clearSession();
-      // NOTE: Preserves IndexedDB local records so offline visits are NEVER deleted
     }
   }
 };

@@ -9,18 +9,21 @@ import {
 } from 'lucide-react';
 import { LocalVisitRecord, LanguageCode } from '../types';
 import { db } from '../db/dexie';
+import { authService } from '../services/auth';
 import { getTranslation, formatSymptomLabel } from '../i18n';
 import { speechRecognitionManager } from '../services/speechRecognition';
 import { voiceSynthesizer } from '../services/speechSynthesis';
 
 interface PatientHistoryProps {
   language: LanguageCode;
+  workerId?: string;
   onBack: () => void;
   onSelectVisit?: (visit: LocalVisitRecord) => void;
 }
 
 export const PatientHistory: React.FC<PatientHistoryProps> = ({
   language,
+  workerId,
   onBack,
   onSelectVisit,
 }) => {
@@ -31,13 +34,19 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
   const [selectedVisit, setSelectedVisit] = useState<LocalVisitRecord | null>(null);
 
   const t = getTranslation(language);
+  const activeWorkerId = workerId || authService.getUser()?.worker_id || 'ASHA_WORKER_001';
 
   useEffect(() => {
     loadVisits();
-  }, []);
+  }, [activeWorkerId]);
 
   const loadVisits = async () => {
-    const list = await db.visits.orderBy('created_at').reverse().toArray();
+    // Strictly isolate patient history to the authenticated health worker
+    const list = await db.visits
+      .where('worker_id')
+      .equals(activeWorkerId)
+      .reverse()
+      .sortBy('created_at');
     setVisits(list);
   };
 

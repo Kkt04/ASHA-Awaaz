@@ -1,17 +1,22 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from typing import List, Dict, Any
 from app.schemas.visit import BatchSyncRequest, BatchSyncResponse
+from app.schemas.auth import WorkerProfile
 from app.api.routes.visits import create_visit
 from app.database.mongodb import db_manager
+from app.api.deps import get_current_worker
 
 router = APIRouter(prefix="/sync", tags=["Offline Batch Synchronization"])
 
 
 @router.post("", response_model=BatchSyncResponse)
-async def sync_offline_records(payload: BatchSyncRequest):
+async def sync_offline_records(
+    payload: BatchSyncRequest,
+    current_worker: WorkerProfile = Depends(get_current_worker)
+):
     """
     Idempotent batch synchronization for visits recorded while offline.
-    Checks existing visit_id to prevent duplicates on network reconnection.
+    Guarantees user data isolation: all synced records belong to the authenticated worker.
     """
     visits_col = db_manager.get_collection("visits")
     synced_ids: List[str] = []
@@ -30,7 +35,9 @@ async def sync_offline_records(payload: BatchSyncRequest):
                     synced_ids.append(v_id)
                     continue
 
-            created = await create_visit(visit_item)
+            # Force worker_id from authenticated session
+            visit_item.worker_id = current_worker.worker_id
+            created = await create_visit(visit_item, current_worker=current_worker)
             synced_ids.append(created.visit_id)
             synced_count += 1
         except Exception as e:

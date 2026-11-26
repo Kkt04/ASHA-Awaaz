@@ -475,3 +475,131 @@ async def test_offline_save_followed_by_online_sync():
         assert count == 1
 
 
+@pytest.mark.asyncio
+async def test_demo_account_login_success():
+    """
+    Verifies that the pre-configured demo account logs in successfully
+    with kavita.asha@gov.in and AshaCare@2026.
+    """
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.post("/api/v1/auth/login", json={
+            "email": "kavita.asha@gov.in",
+            "password": "AshaCare@2026"
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "access_token" in data
+        assert data["worker"]["worker_id"] == "ASHA_WORKER_001"
+        assert data["worker"]["name"] == "Kavita Sharma"
+
+
+@pytest.mark.asyncio
+async def test_demo_account_wrong_password_rejected():
+    """
+    Verifies that incorrect credentials for the demo account are rejected.
+    """
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.post("/api/v1/auth/login", json={
+            "email": "kavita.asha@gov.in",
+            "password": "WrongPassword123"
+        })
+        assert resp.status_code == 401
+        assert "Invalid email or password" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_user_data_isolation_multi_tenant():
+    """
+    Comprehensive test for strict user data isolation:
+    1. Demo User A logs in -> sees demo patients (Sunita, Aarav, Meena).
+    2. New User B registers -> sees an EMPTY dashboard (0 patients, 0 visits).
+    3. User B records a visit for their own patient -> only User B can see it.
+    4. Demo User A cannot see User B's patient or visit.
+    5. User B cannot view Demo User A's patient history.
+    """
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # 1. Login as Demo User A
+        login_a = await ac.post("/api/v1/auth/login", json={
+            "email": "kavita.asha@gov.in",
+            "password": "AshaCare@2026"
+        })
+        assert login_a.status_code == 200
+        token_a = login_a.json()["access_token"]
+        headers_a = {"Authorization": f"Bearer {token_a}"}
+
+        # User A sees demo patients
+        patients_a = await ac.get("/api/v1/patients", headers=headers_a)
+        assert patients_a.status_code == 200
+        names_a = [p["name"] for p in patients_a.json()]
+        assert "Sunita Devi" in names_a
+
+        # 2. Register New User B (Anita)
+        signup_b = await ac.post("/api/v1/auth/signup", json={
+            "name": "Anita Devi",
+            "email": "anita.asha@gov.in",
+            "password": "PasswordAnita123",
+            "role": "ASHA Health Worker",
+            "village": "Village B",
+            "phone": "+91 91111 22222"
+        })
+        assert signup_b.status_code == 201
+        token_b = signup_b.json()["access_token"]
+        headers_b = {"Authorization": f"Bearer {token_b}"}
+
+        # 3. User B must start with EMPTY patients and EMPTY visits
+        patients_b = await ac.get("/api/v1/patients", headers=headers_b)
+        assert patients_b.status_code == 200
+        assert len(patients_b.json()) == 0  # Brand new user has 0 patients!
+
+        visits_b = await ac.get("/api/v1/visits", headers=headers_b)
+        assert visits_b.status_code == 200
+        assert len(visits_b.json()) == 0  # Brand new user has 0 visits!
+
+        # 4. User B records a visit for 'Anita Patient'
+        visit_b_payload = {
+            "visit_id": "VISIT_ANITA_001",
+            "patient_name": "Anita Patient",
+            "worker_id": "ASHA_FAKE_ID",  # Frontend cannot spoof worker_id!
+            "original_transcript": "Anita Patient, 6 months pregnant, BP 120/80",
+            "language": "hi",
+            "structured_data": {
+                "patient_name": "Anita Patient",
+                "category": "pregnant_woman",
+                "pregnancy_month": 6,
+                "vitals": {"blood_pressure": {"systolic": 120, "diastolic": 80}},
+                "symptoms": [],
+                "medicines": [],
+                "missing_fields": [],
+                "uncertain_fields": [],
+                "original_transcript": "Anita Patient, 6 months pregnant, BP 120/80"
+            }
+        }
+        create_b = await ac.post("/api/v1/visits", json=visit_b_payload, headers=headers_b)
+        assert create_b.status_code == 200
+        # The backend derived worker_id from JWT token, not the fake one in payload!
+        assert create_b.json()["worker_id"] == signup_b.json()["worker"]["worker_id"]
+
+        # 5. User B now sees 1 patient and 1 visit
+        patients_b_after = await ac.get("/api/v1/patients", headers=headers_b)
+        assert len(patients_b_after.json()) == 1
+        assert patients_b_after.json()[0]["name"] == "Anita Patient"
+
+        visits_b_after = await ac.get("/api/v1/visits", headers=headers_b)
+        assert len(visits_b_after.json()) == 1
+        assert visits_b_after.json()[0]["visit_id"] == "VISIT_ANITA_001"
+
+        # 6. User A CANNOT see User B's patient or visit
+        patients_a_after = await ac.get("/api/v1/patients", headers=headers_a)
+        names_a_after = [p["name"] for p in patients_a_after.json()]
+        assert "Anita Patient" not in names_a_after
+
+        visits_a_after = await ac.get("/api/v1/visits", headers=headers_a)
+        visit_ids_a = [v["visit_id"] for v in visits_a_after.json()]
+        assert "VISIT_ANITA_001" not in visit_ids_a
+
+        # 7. User B CANNOT access User A's patient history
+        cross_history = await ac.get("/api/v1/patients/PAT_001/history", headers=headers_b)
+        assert cross_history.status_code == 404
+
+
+

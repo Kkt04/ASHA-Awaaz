@@ -49,6 +49,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setErrorMessage(null);
   };
 
+  const handleQuickDemoLogin = async () => {
+    setEmail('kavita.asha@gov.in');
+    setPassword('AshaCare@2026');
+    setErrorMessage(null);
+    setIsLoading(true);
+    try {
+      const res = await authService.login({
+        email: 'kavita.asha@gov.in',
+        password: 'AshaCare@2026',
+      });
+      onLoginSuccess(res.worker);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Invalid email or password.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -179,13 +197,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 <Sparkles className="w-4 h-4 mr-1 text-emerald-600 dark:text-emerald-400" />
                 Demo Evaluation Account
               </span>
-              <button
-                type="button"
-                onClick={handleFillDemo}
-                className="text-xs font-bold text-health-primary dark:text-emerald-400 hover:underline py-1 px-2.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 transition-colors"
-              >
-                {t.quickDemoLogin}
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={handleFillDemo}
+                  className="text-xs font-semibold text-gray-700 dark:text-gray-300 hover:underline py-1 px-2.5 rounded-lg bg-emerald-100/70 dark:bg-emerald-900/40 transition-colors"
+                >
+                  Fill
+                </button>
+                <button
+                  type="button"
+                  onClick={handleQuickDemoLogin}
+                  disabled={isLoading}
+                  className="text-xs font-bold text-white bg-health-primary hover:bg-health-dark py-1 px-3 rounded-lg shadow-sm transition-colors flex items-center space-x-1"
+                >
+                  <Sparkles className="w-3 h-3 text-emerald-300" />
+                  <span>1-Click Login</span>
+                </button>
+              </div>
             </div>
             <p className="text-xs text-emerald-800/80 dark:text-emerald-400/80">
               {t.demoCredentialsNote}

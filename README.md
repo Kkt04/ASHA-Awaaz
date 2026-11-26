@@ -7,7 +7,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-18.3-61dafb?style=for-the-badge&logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178c6?style=for-the-badge&logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-26%20Passed-brightgreen?style=for-the-badge)
+![Tests](https://img.shields.io/badge/Tests-29%20Passed-brightgreen?style=for-the-badge)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-blue?style=for-the-badge&logo=githubactions&logoColor=white)
 ![Languages](https://img.shields.io/badge/Languages-EN%20%7C%20HI%20%7C%20TA%20%7C%20BHO-teal?style=for-the-badge)
 
@@ -317,7 +317,7 @@ cd frontend && npm run build
 
 ---
 
-## 11. Automated Test Suite (26 Passing Tests)
+## 11. Automated Test Suite (29 Passing Tests)
 
 | Test File | Test Case | Purpose |
 |---|---|---|
@@ -334,6 +334,9 @@ cd frontend && npm run build
 | `test_api.py` | `test_repeated_and_double_click_requests_idempotency` | **Verifies double-clicks and repeated requests create 0 duplicates** |
 | `test_api.py` | `test_editing_already_saved_case_updates_without_duplicate` | **Ensures editing a saved case updates in place** |
 | `test_api.py` | `test_offline_save_followed_by_online_sync` | **Ensures offline save followed by sync creates exactly 1 record** |
+| `test_api.py` | `test_demo_account_login_success` | **Guarantees demo account (kavita.asha@gov.in) logs in with 200 OK** |
+| `test_api.py` | `test_demo_account_wrong_password_rejected` | **Rejects incorrect credentials with 401 Unauthorized** |
+| `test_api.py` | `test_user_data_isolation_multi_tenant` | **Strict user isolation: New user gets empty dashboard; cannot view/edit demo data** |
 | `test_extraction.py` | `test_hindi_hinglish_sample_extraction` | Validates extraction from Hindi/Hinglish speech |
 | `test_extraction.py` | `test_tamil_sample_extraction` | Validates extraction from Tamil regional phrasing |
 | `test_extraction.py` | `test_newborn_extraction` | Verifies neonatal vitals and age parsing |

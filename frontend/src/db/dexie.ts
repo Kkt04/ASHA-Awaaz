@@ -11,15 +11,25 @@ export class AshaDatabase extends Dexie {
       visits: '++id, visit_id, patient_id, patient_name, sync_status, created_at',
       patients: '++id, patient_id, name, category, latest_risk_status'
     });
+    // Version 2 adds worker_id index for strict multi-user data isolation
+    this.version(2).stores({
+      visits: '++id, visit_id, patient_id, patient_name, worker_id, sync_status, created_at',
+      patients: '++id, patient_id, name, worker_id, category, latest_risk_status'
+    });
   }
 }
 
 export const db = new AshaDatabase();
 
-// Pre-seed demo patients if empty
-export async function seedLocalDemoPatients() {
-  const count = await db.patients.count();
-  if (count === 0) {
+// Pre-seed demo patients ONLY for the demo account (ASHA_WORKER_001)
+export async function seedLocalDemoPatients(workerId: string = 'ASHA_WORKER_001') {
+  // Never seed demo data into newly registered worker accounts
+  if (workerId !== 'ASHA_WORKER_001') {
+    return;
+  }
+
+  const existingDemoPatients = await db.patients.where('worker_id').equals('ASHA_WORKER_001').count();
+  if (existingDemoPatients === 0) {
     const now = new Date().toISOString();
     await db.patients.bulkAdd([
       {

@@ -79,7 +79,7 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // Initialize Language preference & DB seeds
+  // Initialize Language preference & restore active authenticated session
   useEffect(() => {
     const savedLang = localStorage.getItem('asha_language') as LanguageCode;
     if (savedLang && ['en', 'hi', 'ta', 'bho'].includes(savedLang)) {
@@ -88,19 +88,70 @@ export const App: React.FC = () => {
       setLanguage('en');
       localStorage.setItem('asha_language', 'en');
     }
-    // Initialize DB with demo seeds & load metrics
-    seedLocalDemoPatients().then(loadMetrics);
+
+    // Restore authenticated session from localStorage
+    const token = authService.getToken();
+    const cachedUser = authService.getUser();
+    if (token && cachedUser) {
+      setCurrentUser(cachedUser);
+      setIsAuthenticated(true);
+      setCurrentScreen('home');
+
+      // Verify session with backend to ensure token validity
+      authService.fetchProfile().then((freshUser) => {
+        if (freshUser) {
+          setCurrentUser(freshUser);
+        } else {
+          // Token expired or invalid
+          setIsAuthenticated(false);
+          setCurrentUser(null);
+          setCurrentScreen('landing');
+        }
+      });
+    }
   }, []);
 
-  const loadMetrics = async () => {
+  // Isolate data loading whenever the logged-in user changes
+  useEffect(() => {
+    if (currentUser) {
+      if (currentUser.worker_id === 'ASHA_WORKER_001') {
+        // Seed demo patients exclusively for the demo account
+        seedLocalDemoPatients('ASHA_WORKER_001').then(() => loadMetrics(currentUser.worker_id));
+      } else {
+        // Newly registered users start with an isolated, empty dashboard
+        loadMetrics(currentUser.worker_id);
+      }
+    } else {
+      setTotalVisits(0);
+      setHighRiskCount(0);
+      setRecentVisits([]);
+      setPendingSyncCount(0);
+    }
+  }, [currentUser]);
+
+  const loadMetrics = async (targetWorkerId?: string) => {
     try {
-      const all = await db.visits.toArray();
-      setTotalVisits(all.length);
-      const highRisk = all.filter((v) => v.risk_evaluation?.is_high_risk).length;
+      const workerId = targetWorkerId || currentUser?.worker_id;
+      if (!workerId) {
+        setTotalVisits(0);
+        setHighRiskCount(0);
+        setRecentVisits([]);
+        setPendingSyncCount(0);
+        return;
+      }
+
+      // Query only records belonging to the authenticated worker
+      const userVisits = await db.visits.where('worker_id').equals(workerId).toArray();
+      setTotalVisits(userVisits.length);
+      const highRisk = userVisits.filter((v) => v.risk_evaluation?.is_high_risk).length;
       setHighRiskCount(highRisk);
-      const recents = await db.visits.orderBy('created_at').reverse().limit(5).toArray();
-      setRecentVisits(recents);
-      const pending = await db.visits.where('sync_status').equals('pending').count();
+      const recents = await db.visits.where('worker_id').equals(workerId).reverse().sortBy('created_at');
+      setRecentVisits(recents.slice(0, 5));
+      const pending = await db.visits
+        .where('worker_id')
+        .equals(workerId)
+        .filter((v) => v.sync_status === 'pending')
+        .count();
       setPendingSyncCount(pending);
     } catch (e) {
       console.warn('Could not load metrics from db:', e);
@@ -144,6 +195,10 @@ export const App: React.FC = () => {
     await authService.logout();
     setCurrentUser(null);
     setIsAuthenticated(false);
+    setTotalVisits(0);
+    setHighRiskCount(0);
+    setRecentVisits([]);
+    setPendingSyncCount(0);
     setCurrentScreen('landing');
     showToast(t.signedOutToast);
   };
@@ -211,9 +266,10 @@ export const App: React.FC = () => {
         riskEvaluation,
         currentTranscript,
         language,
-        caseIdToSave
+        caseIdToSave,
+        currentUser?.worker_id
       );
-      await loadMetrics();
+      await loadMetrics(currentUser?.worker_id);
 
       voiceSynthesizer.speak(t.confirmAudio, language);
       showToast('Case recorded successfully.');
@@ -559,6 +615,7 @@ export const App: React.FC = () => {
         {currentScreen === 'history' && (
           <PatientHistory
             language={language}
+            workerId={currentUser?.worker_id}
             onBack={() => setCurrentScreen('home')}
           />
         )}
@@ -569,7 +626,7 @@ export const App: React.FC = () => {
         isOpen={isDemoModalOpen}
         onClose={() => setIsDemoModalOpen(false)}
         onDemoCompleted={async () => {
-          await loadMetrics();
+          await loadMetrics(currentUser?.worker_id);
           setCurrentScreen('history');
         }}
       />

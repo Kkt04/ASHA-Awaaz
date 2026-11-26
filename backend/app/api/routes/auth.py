@@ -8,7 +8,7 @@ import jwt
 from fastapi import APIRouter, HTTPException, Header, status
 
 from app.config import settings
-from app.database.mongodb import db_manager
+from app.database.mongodb import db_manager, DEMO_WORKER_ID, DEMO_EMAIL, DEMO_PASSWORD_HASH, DEMO_SALT
 from app.schemas.auth import (
     WorkerProfile,
     UserSignupRequest,
@@ -19,7 +19,7 @@ from app.schemas.auth import (
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Worker Authentication"])
 
-# PBKDF2 password hashing helpers
+
 def hash_password(password: str, salt: Optional[str] = None) -> tuple[str, str]:
     if not salt:
         salt = secrets.token_hex(16)
@@ -62,6 +62,7 @@ async def worker_signup(req: UserSignupRequest):
     """
     Registers a new health worker account with credentials,
     saves in MongoDB/in-memory store, and issues a secure JWT token.
+    Guarantees a clean, private data space with zero pre-existing patient records.
     """
     workers_col = db_manager.get_collection("workers")
     email_clean = req.email.strip().lower()
@@ -118,28 +119,26 @@ async def worker_login(credentials: Optional[UserLoginRequest] = None):
     """
     Validates health worker credentials against database records
     and generates an authenticated JWT session.
-    Also supports default demo login if invoked without credentials.
     """
     workers_col = db_manager.get_collection("workers")
 
     # If invoked without body (demo backwards-compatibility), return demo Kavita Sharma
     if not credentials or not credentials.email:
-        demo_worker = await workers_col.find_one({"worker_id": "ASHA_WORKER_001"})
-        if demo_worker:
-            token = create_access_token("ASHA_WORKER_001", demo_worker.get("email", "kavita.asha@gov.in"), demo_worker.get("role", "ASHA Health Worker"))
-            profile = WorkerProfile(
-                worker_id="ASHA_WORKER_001",
-                name=demo_worker.get("name", "Kavita Sharma"),
-                email=demo_worker.get("email", "kavita.asha@gov.in"),
-                role=demo_worker.get("role", "ASHA Health Worker"),
-                village=demo_worker.get("village", "Rampur (Sub-Centre Kalyanpur)"),
-                preferred_language=demo_worker.get("preferred_language", "en"),
-                phone=demo_worker.get("phone", "+91 98765 12345")
-            )
-            return AuthResponse(access_token=token, token_type="bearer", worker=profile)
-        # Fallback profile
-        token = create_access_token("ASHA_WORKER_001", "kavita.asha@gov.in", "ASHA Health Worker")
-        return AuthResponse(access_token=token, token_type="bearer", worker=WorkerProfile())
+        demo_worker = await workers_col.find_one({"worker_id": DEMO_WORKER_ID})
+        if not demo_worker:
+            demo_worker = await workers_col.find_one({"email": DEMO_EMAIL})
+
+        token = create_access_token(DEMO_WORKER_ID, DEMO_EMAIL, "ASHA Health Worker")
+        profile = WorkerProfile(
+            worker_id=DEMO_WORKER_ID,
+            name=demo_worker.get("name", "Kavita Sharma") if demo_worker else "Kavita Sharma",
+            email=DEMO_EMAIL,
+            role="ASHA Health Worker",
+            village=demo_worker.get("village", "Rampur (Sub-Centre Kalyanpur)") if demo_worker else "Rampur (Sub-Centre Kalyanpur)",
+            preferred_language=demo_worker.get("preferred_language", "en") if demo_worker else "en",
+            phone=demo_worker.get("phone", "+91 98765 12345") if demo_worker else "+91 98765 12345"
+        )
+        return AuthResponse(access_token=token, token_type="bearer", worker=profile)
 
     email_clean = credentials.email.strip().lower()
 
@@ -148,10 +147,15 @@ async def worker_login(credentials: Optional[UserLoginRequest] = None):
     if not user:
         user = await workers_col.find_one({"worker_id": credentials.email.strip().upper()})
 
+    # If demo worker was not yet seeded in fresh DB instance, safely handle
+    if not user and email_clean == DEMO_EMAIL:
+        await db_manager.ensure_seed_data()
+        user = await workers_col.find_one({"email": DEMO_EMAIL})
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password. Please check your credentials."
+            detail="Invalid email or password."
         )
 
     # Validate password
@@ -159,7 +163,7 @@ async def worker_login(credentials: Optional[UserLoginRequest] = None):
     salt = user.get("salt")
 
     if not stored_hash or not salt:
-        # If user record had no hash (legacy seed), allow AshaCare@2026 or set it
+        # Legacy fallback verification for demo account
         if credentials.password != "AshaCare@2026":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -196,7 +200,6 @@ async def worker_login(credentials: Optional[UserLoginRequest] = None):
 async def get_worker_profile(authorization: Optional[str] = Header(None)):
     """
     Returns current authenticated health worker profile from JWT token.
-    Falls back gracefully if called without header for backwards compatibility.
     """
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
@@ -216,14 +219,14 @@ async def get_worker_profile(authorization: Optional[str] = Header(None)):
                     phone=user.get("phone", "+91 98765 12345")
                 )
 
-    # Default profile for existing tests and demo
+    # Default demo profile for backwards compatibility
     workers_col = db_manager.get_collection("workers")
-    demo_worker = await workers_col.find_one({"worker_id": "ASHA_WORKER_001"})
+    demo_worker = await workers_col.find_one({"worker_id": DEMO_WORKER_ID})
     if demo_worker:
         return WorkerProfile(
-            worker_id="ASHA_WORKER_001",
+            worker_id=DEMO_WORKER_ID,
             name=demo_worker.get("name", "Kavita Sharma"),
-            email=demo_worker.get("email", "kavita.asha@gov.in"),
+            email=demo_worker.get("email", DEMO_EMAIL),
             role=demo_worker.get("role", "ASHA Health Worker"),
             village=demo_worker.get("village", "Rampur (Sub-Centre Kalyanpur)"),
             preferred_language=demo_worker.get("preferred_language", "en"),
