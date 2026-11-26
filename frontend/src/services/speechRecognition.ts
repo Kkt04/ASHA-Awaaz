@@ -43,7 +43,7 @@ export class SpeechRecognitionManager {
     }
 
     this.currentLanguage = language;
-    const langCode = language === 'ta' ? 'ta-IN' : 'hi-IN';
+    const langCode = language === 'ta' ? 'ta-IN' : language === 'en' ? 'en-IN' : 'hi-IN';
     this.recognition.lang = langCode;
 
     let fullTranscript = '';

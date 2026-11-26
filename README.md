@@ -21,7 +21,7 @@
 
 **ASHA Awaaz** (आशा आवाज़ / ஆஷா அவாஸ்) is a voice-first, offline-capable Progressive Web Application designed specifically for Accredited Social Health Activist (ASHA) community health workers in rural and semi-urban India.
 
-Instead of writing complex medical details across 4 to 8 separate physical paper registers, an ASHA worker simply speaks naturally in **Hindi**, **Tamil**, or **Hinglish** during or after a home visit:
+Instead of writing complex medical details across 4 to 8 separate physical paper registers, an ASHA worker simply speaks naturally in **Hindi**, **Tamil**, **English**, or **Hinglish** during or after a home visit:
 
 > *"Sunita, 7 mahine ki pregnant hai, BP 150 by 100 hai, pairon mein sujan hai aur iron ki goli nahi li."*
 

@@ -51,3 +51,4 @@ class ExtractionResponse(BaseModel):
     engine_used: Literal["groq_llm", "deterministic_fallback"]
     speech_summary_hi: str = Field("", description="Hindi summary for TTS read-back")
     speech_summary_ta: str = Field("", description="Tamil summary for TTS read-back")
+    speech_summary_en: str = Field("", description="English summary for TTS read-back")

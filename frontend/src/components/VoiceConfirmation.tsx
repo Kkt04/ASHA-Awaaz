@@ -64,7 +64,7 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
         setSpokenReply(text);
         const lower = text.toLowerCase().trim();
 
-        // Check if user confirmed with "haan", "ha", "sahi hai", "theek hai", "yes", "ஆம்", "சரி"
+        // Check if user confirmed with "haan", "ha", "sahi hai", "theek hai", "yes", "confirm", "correct", "ஆம்", "சரி"
         if (
           lower === 'haan' ||
           lower.startsWith('haan') ||
@@ -72,6 +72,12 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
           lower === 'sahi hai' ||
           lower === 'theek hai' ||
           lower === 'yes' ||
+          lower.startsWith('yes') ||
+          lower === 'confirm' ||
+          lower === 'correct' ||
+          lower === 'right' ||
+          lower === 'okay' ||
+          lower === 'ok' ||
           lower === 'ஆம்' ||
           lower === 'சரி'
         ) {
@@ -104,7 +110,11 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
       const res = await extractVisitVoice(correctionTranscript, language, data);
       onCorrectionMade(
         res.extracted,
-        language === 'ta' ? res.summaryTa : res.summaryHi
+        language === 'ta'
+          ? res.summaryTa
+          : language === 'en'
+          ? res.summaryEn
+          : res.summaryHi
       );
     } catch (e) {
       console.warn('Voice correction error:', e);

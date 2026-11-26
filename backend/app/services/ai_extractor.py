@@ -64,13 +64,14 @@ class AIExtractorService:
         if not self.api_key or self.api_key.strip() == "":
             logger.info("No Groq API key found. Using deterministic fallback extractor.")
             extracted = fallback_extractor.extract(transcript, language, existing_data)
-            hi_sum, ta_sum = fallback_extractor.generate_spoken_summaries(extracted)
+            hi_sum, ta_sum, en_sum = fallback_extractor.generate_spoken_summaries(extracted)
             return ExtractionResponse(
                 success=True,
                 extracted=extracted,
                 engine_used="deterministic_fallback",
                 speech_summary_hi=hi_sum,
-                speech_summary_ta=ta_sum
+                speech_summary_ta=ta_sum,
+                speech_summary_en=en_sum
             )
 
         # Attempt Groq LLM extraction
@@ -101,13 +102,14 @@ class AIExtractorService:
                     parsed_json = json.loads(content)
                     parsed_json["original_transcript"] = transcript
                     extracted = StructuredVisitData.model_validate(parsed_json)
-                    hi_sum, ta_sum = fallback_extractor.generate_spoken_summaries(extracted)
+                    hi_sum, ta_sum, en_sum = fallback_extractor.generate_spoken_summaries(extracted)
                     return ExtractionResponse(
                         success=True,
                         extracted=extracted,
                         engine_used="groq_llm",
                         speech_summary_hi=hi_sum,
-                        speech_summary_ta=ta_sum
+                        speech_summary_ta=ta_sum,
+                        speech_summary_en=en_sum
                     )
                 else:
                     logger.warning(f"Groq API error ({resp.status_code}): {resp.text}. Falling back.")
@@ -116,13 +118,14 @@ class AIExtractorService:
 
         # Fallback on any failure
         extracted = fallback_extractor.extract(transcript, language, existing_data)
-        hi_sum, ta_sum = fallback_extractor.generate_spoken_summaries(extracted)
+        hi_sum, ta_sum, en_sum = fallback_extractor.generate_spoken_summaries(extracted)
         return ExtractionResponse(
             success=True,
             extracted=extracted,
             engine_used="deterministic_fallback",
             speech_summary_hi=hi_sum,
-            speech_summary_ta=ta_sum
+            speech_summary_ta=ta_sum,
+            speech_summary_en=en_sum
         )
 
 

@@ -103,7 +103,12 @@ export const App: React.FC = () => {
       setRiskEvaluation(risk);
 
       // 3. Generate summary text for TTS
-      const summary = language === 'ta' ? extractionRes.summaryTa : extractionRes.summaryHi;
+      const summary =
+        language === 'ta'
+          ? extractionRes.summaryTa
+          : language === 'en'
+          ? extractionRes.summaryEn
+          : extractionRes.summaryHi;
       setSpokenSummary(summary);
 
       // 4. Move to confirmation screen

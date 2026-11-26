@@ -88,9 +88,11 @@ def test_missing_fields_detection():
 def test_spoken_summaries_generation():
     transcript = "Sunita, 7 mahine ki pregnant hai, BP 150 by 100 hai, pairon mein sujan hai aur iron ki goli nahi li."
     data = fallback_extractor.extract(transcript, language="hi")
-    hi_summary, ta_summary = fallback_extractor.generate_spoken_summaries(data)
+    hi_summary, ta_summary, en_summary = fallback_extractor.generate_spoken_summaries(data)
     
     assert "Sunita" in hi_summary
     assert "7 महीने की गर्भवती" in hi_summary
     assert "150 बाई 100" in hi_summary
     assert "क्या यह सही है?" in hi_summary
+    assert "7 months pregnant" in en_summary
+    assert "Is this information correct?" in en_summary

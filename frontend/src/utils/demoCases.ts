@@ -1,9 +1,11 @@
+import { LanguageCode } from '../types';
+
 export interface DemoCase {
   id: string;
   title: string;
   patientName: string;
   category: string;
-  language: 'hi' | 'ta';
+  language: LanguageCode;
   transcript: string;
   simulatedAudioDurationSec: number;
   expectedRisk: 'danger' | 'normal';
@@ -21,6 +23,17 @@ export const DEMO_CASES: DemoCase[] = [
     simulatedAudioDurationSec: 5,
     expectedRisk: 'danger',
     description: '7-महीने की गर्भवती, बीपी 150/100, पैरों में सूजन (प्री-एक्लेम्पसिया खतरा).'
+  },
+  {
+    id: 'demo-sunita-en',
+    title: 'Sunita Devi (English - Pregnant High Risk)',
+    patientName: 'Sunita Devi',
+    category: 'pregnant_woman',
+    language: 'en',
+    transcript: 'Sunita is 7 months pregnant, BP is 150 by 100, swelling in feet and iron tablet missed.',
+    simulatedAudioDurationSec: 5,
+    expectedRisk: 'danger',
+    description: '7 months pregnant, BP 150/100, swelling in feet (Preeclampsia danger alert).'
   },
   {
     id: 'demo-aarav',

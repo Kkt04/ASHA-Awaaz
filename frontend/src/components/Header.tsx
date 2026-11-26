@@ -60,12 +60,25 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const handleToggleLang = () => {
-    const nextLang: LanguageCode = language === 'hi' ? 'ta' : 'hi';
+    let nextLang: LanguageCode = 'hi';
+    if (language === 'hi') nextLang = 'ta';
+    else if (language === 'ta') nextLang = 'en';
+    else nextLang = 'hi';
+
     onLanguageChange(nextLang);
-    voiceSynthesizer.speak(
-      nextLang === 'hi' ? 'भाषा हिन्दी चुनी गई' : 'மொழி தமிழ் தேர்ந்தெடுக்கப்பட்டது',
-      nextLang
-    );
+    const msg =
+      nextLang === 'hi'
+        ? 'भाषा हिन्दी'
+        : nextLang === 'ta'
+        ? 'மொழி தமிழ்'
+        : 'Language English';
+    voiceSynthesizer.speak(msg, nextLang);
+  };
+
+  const getLangBadge = () => {
+    if (language === 'hi') return 'हिन्दी';
+    if (language === 'ta') return 'தமிழ்';
+    return 'EN';
   };
 
   return (
@@ -129,9 +142,10 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={handleToggleLang}
             className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 active:bg-white/30 text-xs font-bold text-white border border-white/20 touch-target"
+            title="Switch Language (हिन्दी / தமிழ் / English)"
           >
             <Globe className="w-3.5 h-3.5" />
-            <span>{language === 'hi' ? 'தமிழ்' : 'हिन्दी'}</span>
+            <span>{getLangBadge()}</span>
           </button>
         </div>
       </div>

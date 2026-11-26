@@ -43,12 +43,14 @@ export const DemoModeModal: React.FC<DemoModeModalProps> = ({
     setRiskEval(null);
 
     // Speak initial prompt
-    voiceSynthesizer.speak(
+    const initialGreeting =
       demoCase.language === 'ta'
         ? 'வணக்கம், வருகை விவரங்களைப் பேசுங்கள்.'
-        : 'नमस्ते, विज़िट के बारे में बोलिए।',
-      demoCase.language
-    );
+        : demoCase.language === 'en'
+        ? 'Welcome, please speak about the visit.'
+        : 'नमस्ते, विज़िट के बारे में बोलिए।';
+
+    voiceSynthesizer.speak(initialGreeting, demoCase.language);
 
     // Simulate speech typing in real-time
     const fullText = demoCase.transcript;
@@ -76,12 +78,25 @@ export const DemoModeModal: React.FC<DemoModeModalProps> = ({
     // Move to Step 3: Confirmation read-aloud
     setTimeout(() => {
       setCurrentStep(3);
-      const summaryToSpeak = demoCase.language === 'ta' ? res.summaryTa : res.summaryHi;
+      const summaryToSpeak =
+        demoCase.language === 'ta'
+          ? res.summaryTa
+          : demoCase.language === 'en'
+          ? res.summaryEn
+          : res.summaryHi;
+
       voiceSynthesizer.speak(summaryToSpeak, demoCase.language, () => {
-        // Step 4: Simulated "Haan" confirmation
+        // Step 4: Simulated confirmation
         setTimeout(async () => {
           setCurrentStep(4);
-          voiceSynthesizer.speak('हाँ, सही है।', demoCase.language, async () => {
+          const confirmText =
+            demoCase.language === 'ta'
+              ? 'ஆம், சரியானது.'
+              : demoCase.language === 'en'
+              ? 'Yes, that is correct.'
+              : 'हाँ, सही है।';
+
+          voiceSynthesizer.speak(confirmText, demoCase.language, async () => {
             // Step 5: Save record
             setCurrentStep(5);
             const saved = await saveVisitRecord(
@@ -90,7 +105,15 @@ export const DemoModeModal: React.FC<DemoModeModalProps> = ({
               demoCase.transcript,
               demoCase.language
             );
-            voiceSynthesizer.speak('रिकॉर्ड सेव हो गया।', demoCase.language);
+
+            const savedText =
+              demoCase.language === 'ta'
+                ? 'பதிவு வெற்றிகரமாக சேமிக்கப்பட்டது.'
+                : demoCase.language === 'en'
+                ? 'Record saved successfully.'
+                : 'रिकॉर्ड सेव हो गया।';
+
+            voiceSynthesizer.speak(savedText, demoCase.language);
 
             setTimeout(() => {
               setCurrentStep(6); // Step 6: Complete

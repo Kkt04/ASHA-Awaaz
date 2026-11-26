@@ -148,7 +148,7 @@ export function extractLocally(
   return data;
 }
 
-export function generateSpokenSummaries(data: StructuredVisitData): { hi: string; ta: string } {
+export function generateSpokenSummaries(data: StructuredVisitData): { hi: string; ta: string; en: string } {
   const name = data.patient_name || 'मरीज़';
   const partsHi: string[] = [name];
 
@@ -156,6 +156,8 @@ export function generateSpokenSummaries(data: StructuredVisitData): { hi: string
     partsHi.push(`${data.pregnancy_month} महीने की गर्भवती`);
   } else if (data.category === 'newborn' && data.newborn_age_days) {
     partsHi.push(`${data.newborn_age_days} दिन का नवजात`);
+  } else if (data.category === 'child' && data.child_age_years) {
+    partsHi.push(`${data.child_age_years} साल का बच्चा`);
   }
 
   if (data.vitals?.blood_pressure?.systolic) {
@@ -186,6 +188,8 @@ export function generateSpokenSummaries(data: StructuredVisitData): { hi: string
   const partsTa: string[] = [nameTa];
   if (data.category === 'pregnant_woman' && data.pregnancy_month) {
     partsTa.push(`${data.pregnancy_month} மாத கர்ப்பிணி`);
+  } else if (data.category === 'newborn' && data.newborn_age_days) {
+    partsTa.push(`${data.newborn_age_days} நாட்கள் குழந்தை`);
   }
   if (data.vitals?.blood_pressure?.systolic) {
     partsTa.push(`பிபி ${data.vitals.blood_pressure.systolic}/${data.vitals.blood_pressure.diastolic}`);
@@ -200,5 +204,38 @@ export function generateSpokenSummaries(data: StructuredVisitData): { hi: string
   }
   const ta = partsTa.join(', ') + '. இது சரியா?';
 
-  return { hi, ta };
+  // English
+  const nameEn = data.patient_name || 'Patient';
+  const partsEn: string[] = [nameEn];
+  if (data.category === 'pregnant_woman' && data.pregnancy_month) {
+    partsEn.push(`${data.pregnancy_month} months pregnant`);
+  } else if (data.category === 'newborn' && data.newborn_age_days) {
+    partsEn.push(`${data.newborn_age_days} days old newborn`);
+  } else if (data.category === 'child' && data.child_age_years) {
+    partsEn.push(`${data.child_age_years} years old child`);
+  }
+
+  if (data.vitals?.blood_pressure?.systolic) {
+    partsEn.push(`BP ${data.vitals.blood_pressure.systolic} over ${data.vitals.blood_pressure.diastolic}`);
+  }
+  if (data.vitals?.temperature_f) {
+    partsEn.push(`Fever ${data.vitals.temperature_f} degrees`);
+  }
+  if (data.vitals?.weight_kg) {
+    partsEn.push(`Weight ${data.vitals.weight_kg} kg`);
+  }
+  if (data.symptoms.includes('swelling_in_feet')) {
+    partsEn.push('Swelling in feet');
+  }
+  if (data.symptoms.includes('bleeding')) {
+    partsEn.push('Bleeding');
+  }
+  for (const m of data.medicines) {
+    if (m.name === 'iron_tablet') {
+      partsEn.push(m.status === 'missed' ? 'Iron tablet missed' : 'Iron tablet taken');
+    }
+  }
+  const en = partsEn.join(', ') + '. Is this information correct?';
+
+  return { hi, ta, en };
 }

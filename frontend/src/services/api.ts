@@ -14,7 +14,7 @@ export async function extractVisitVoice(
   transcript: string,
   language: LanguageCode = 'hi',
   existingData?: StructuredVisitData
-): Promise<{ extracted: StructuredVisitData; engine: string; summaryHi: string; summaryTa: string }> {
+): Promise<{ extracted: StructuredVisitData; engine: string; summaryHi: string; summaryTa: string; summaryEn: string }> {
   try {
     const res = await fetch(`${API_BASE}/extract`, {
       method: 'POST',
@@ -29,6 +29,7 @@ export async function extractVisitVoice(
         engine: data.engine_used,
         summaryHi: data.speech_summary_hi,
         summaryTa: data.speech_summary_ta,
+        summaryEn: data.speech_summary_en || data.speech_summary_hi,
       };
     }
   } catch (err) {
@@ -37,12 +38,13 @@ export async function extractVisitVoice(
 
   // Local offline extraction
   const extracted = extractLocally(transcript, existingData);
-  const { hi, ta } = generateSpokenSummaries(extracted);
+  const { hi, ta, en } = generateSpokenSummaries(extracted);
   return {
     extracted,
     engine: 'local_offline_deterministic',
     summaryHi: hi,
     summaryTa: ta,
+    summaryEn: en,
   };
 }
 

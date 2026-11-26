@@ -28,18 +28,24 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const [showManualFallback, setShowManualFallback] = useState<boolean>(false);
   
   const timerRef = useRef<any>(null);
+  const hasSpokenRef = useRef<boolean>(false);
   const t = getTranslation(language);
 
   useEffect(() => {
-    // 1. Initial Spoken Greeting
-    const promptText = language === 'ta' 
-      ? 'வணக்கம், வருகை விவரங்களைப் பேசுங்கள்.'
-      : 'नमस्ते, विज़िट के बारे में बोलिए।';
+    // 1. Initial Spoken Greeting (strictly run once per recording session)
+    if (!hasSpokenRef.current) {
+      hasSpokenRef.current = true;
+      const promptText =
+        language === 'ta'
+          ? 'வணக்கம், வருகை விவரங்களைப் பேசுங்கள்.'
+          : language === 'en'
+          ? 'Welcome, please speak about the visit.'
+          : 'नमस्ते, विज़िट के बारे में बोलिए।';
 
-    voiceSynthesizer.speak(promptText, language, () => {
-      // Start microphone after prompt finishes
-      startRecordingSession();
-    });
+      voiceSynthesizer.speak(promptText, language, () => {
+        startRecordingSession();
+      });
+    }
 
     // 2. Timer
     timerRef.current = setInterval(() => {

@@ -233,9 +233,9 @@ class DeterministicFallbackExtractor:
             ))
         return meds
 
-    def generate_spoken_summaries(self, data: StructuredVisitData) -> Tuple[str, str]:
+    def generate_spoken_summaries(self, data: StructuredVisitData) -> Tuple[str, str, str]:
         """
-        Generates spoken text for text-to-speech confirmation in Hindi and Tamil.
+        Generates spoken text for text-to-speech confirmation in Hindi, Tamil, and English.
         """
         name = data.patient_name or "मरीज़"
         
@@ -245,6 +245,8 @@ class DeterministicFallbackExtractor:
             parts_hi.append(f"{data.pregnancy_month} महीने की गर्भवती")
         elif data.category == "newborn" and data.newborn_age_days:
             parts_hi.append(f"{data.newborn_age_days} दिन का नवजात")
+        elif data.category == "child" and data.child_age_years:
+            parts_hi.append(f"{data.child_age_years} साल का बच्चा")
 
         if data.vitals and data.vitals.blood_pressure and data.vitals.blood_pressure.systolic:
             bp = data.vitals.blood_pressure
@@ -277,6 +279,8 @@ class DeterministicFallbackExtractor:
         parts_ta = [f"{name_ta}"]
         if data.category == "pregnant_woman" and data.pregnancy_month:
             parts_ta.append(f"{data.pregnancy_month} மாத கர்ப்பிணி")
+        elif data.category == "newborn" and data.newborn_age_days:
+            parts_ta.append(f"{data.newborn_age_days} நாட்கள் குழந்தை")
         if data.vitals and data.vitals.blood_pressure and data.vitals.blood_pressure.systolic:
             bp = data.vitals.blood_pressure
             parts_ta.append(f"பிபி {bp.systolic} / {bp.diastolic}")
@@ -288,7 +292,34 @@ class DeterministicFallbackExtractor:
 
         summary_ta = ", ".join(parts_ta) + ". இது சரியா?"
 
-        return summary_hi, summary_ta
+        # English summary
+        name_en = data.patient_name or "Patient"
+        parts_en = [f"{name_en}"]
+        if data.category == "pregnant_woman" and data.pregnancy_month:
+            parts_en.append(f"{data.pregnancy_month} months pregnant")
+        elif data.category == "newborn" and data.newborn_age_days:
+            parts_en.append(f"{data.newborn_age_days} days old newborn")
+        elif data.category == "child" and data.child_age_years:
+            parts_en.append(f"{data.child_age_years} years old child")
+
+        if data.vitals and data.vitals.blood_pressure and data.vitals.blood_pressure.systolic:
+            bp = data.vitals.blood_pressure
+            parts_en.append(f"Blood pressure {bp.systolic} over {bp.diastolic}")
+        if data.vitals and data.vitals.temperature_f:
+            parts_en.append(f"Fever {data.vitals.temperature_f} degrees")
+        if data.vitals and data.vitals.weight_kg:
+            parts_en.append(f"Weight {data.vitals.weight_kg} kg")
+        if "swelling_in_feet" in data.symptoms:
+            parts_en.append("Swelling in feet")
+        if "bleeding" in data.symptoms:
+            parts_en.append("Bleeding")
+        for med in data.medicines:
+            if med.name == "iron_tablet":
+                parts_en.append("Iron tablet missed" if med.status == "missed" else "Iron tablet taken")
+
+        summary_en = ", ".join(parts_en) + ". Is this information correct?"
+
+        return summary_hi, summary_ta, summary_en
 
 
 fallback_extractor = DeterministicFallbackExtractor()
