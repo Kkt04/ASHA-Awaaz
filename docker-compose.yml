@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: asha_awaaz_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - DATABASE_NAME=asha_awaaz
+      - JWT_SECRET=asha-awaaz-secret-key-build-for-bharat-2026
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+    depends_on:
+      - mongodb
+    networks:
+      - asha_network
+
+  mongodb:
+    image: mongo:7.0
+    container_name: asha_awaaz_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - asha_network
+
+volumes:
+  mongo_data:
+
+networks:
+  asha_network:
+    driver: bridge
