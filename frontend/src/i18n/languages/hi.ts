@@ -189,13 +189,13 @@ export const hi: TranslationSchema = {
   heroBadge: 'भारत के लिए आवाज-आधारित स्वास्थ्य रजिस्टर',
   heroHeadline: 'कागजी काम कम।',
   heroHeadlineSub: 'मरीज़ों की देखभाल ज्यादा।',
-  heroSupportingText: 'आशा आवाज़ सामुदायिक स्वास्थ्य कार्यकर्ताओं को अपनी भाषा में केवल बोलकर मरीज़ों की बातचीत को डिजिटल स्वास्थ्य रजिस्टर में बदलने में मदद करती है।',
+  heroSupportingText: 'हर बातचीत के साथ, हर घर तक संवेदनशील स्वास्थ्य सेवा पहुँचाना। कागजी काम कम, देखभाल ज्यादा।',
   heroCtaPrimary: 'शुरू करें',
   heroCtaSecondary: 'काम करने का तरीका देखें',
-  heroVisualTag: 'आवाज-सक्रिय फील्ड रजिस्टर',
-  heroCardPreviewTitle: 'सुनीता देवी (7वां महीना एएनसी)',
-  heroCardPreviewSubtitle: 'बीपी: 150/100 • पैरों में सूजन',
-  heroCardPreviewDanger: 'खतरे की चेतावनी: प्री-एक्लेम्पसिया संकेत',
+  heroVisualTag: 'सामुदायिक स्वास्थ्य विज़िट',
+  heroCardPreviewTitle: 'घर पर आत्मीय स्वास्थ्य संवाद',
+  heroCardPreviewSubtitle: 'नियमित स्वास्थ्य जांच और सहज बातचीत',
+  heroCardPreviewDanger: 'संवेदनशील देखभाल: घर पर स्वास्थ्य आवश्यकताओं को समझना',
 
   // Landing Page - How It Works
   howItWorksBadge: '3 आसान चरण',

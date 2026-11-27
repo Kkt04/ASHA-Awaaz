@@ -31,6 +31,7 @@ import { LocalVisitRecord, LanguageCode } from '../types';
 import { WorkerUser } from '../services/auth';
 import { getTranslation } from '../i18n';
 import { db } from '../db/dexie';
+import { AshaHeroIllustration } from './AshaHeroIllustration';
 
 interface AuthenticatedDashboardProps {
   language: LanguageCode;
@@ -211,22 +212,7 @@ export const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
 
           {/* Right Column: Healthcare Artwork Card */}
           <div className="md:col-span-4 flex justify-center md:justify-end">
-            <div className="relative rounded-2xl bg-white/70 dark:bg-dark-surface/60 border border-emerald-100 dark:border-dark-border p-2 shadow-sm max-w-[220px] w-full flex flex-col items-center">
-              <picture className="w-full flex items-center justify-center">
-                <source media="(prefers-reduced-motion: reduce)" srcSet="/assets/asha-healthcare-worker.png" type="image/png" />
-                <img
-                  src="/assets/asha-healthcare-worker.gif"
-                  alt="ASHA worker interacting with expectant mother"
-                  className="w-full h-auto max-h-[140px] object-contain drop-shadow-sm"
-                  loading="lazy"
-                  width={512}
-                  height={348}
-                />
-              </picture>
-              <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 mt-1">
-                ASHA Maternal Care
-              </span>
-            </div>
+            <AshaHeroIllustration variant="dashboard" language={language} />
           </div>
         </div>
       </section>

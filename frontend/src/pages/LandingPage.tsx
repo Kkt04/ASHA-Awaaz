@@ -224,8 +224,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
             
-            {/* Left Content Column (7 cols) */}
-            <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
+            {/* Left Content Column (6 cols on large screens) */}
+            <div className="lg:col-span-6 space-y-6 text-center lg:text-left">
               
               {/* Product Badge */}
               <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-emerald-100/80 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 text-xs sm:text-sm font-semibold text-emerald-900 dark:text-emerald-300">
@@ -243,7 +243,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
               {/* Supporting Text */}
               <p className="text-lg sm:text-xl text-gray-600 dark:text-dark-muted max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal">
-                {t.heroSupportingText}
+                {t.heroSupportingText || 'Bringing compassionate healthcare closer to every home, one conversation at a time.'}
               </p>
 
               {/* CTA Buttons */}
@@ -265,32 +265,32 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </button>
               </div>
 
-              {/* Key Trust Signals */}
-              <div className="pt-6 border-t border-gray-200/80 dark:border-dark-border grid grid-cols-3 gap-2 sm:gap-4 max-w-lg mx-auto lg:mx-0 text-left">
+              {/* Key Trust Signals: Accurate, Non-Exaggerated Capabilities */}
+              <div className="pt-6 border-t border-gray-200/80 dark:border-dark-border grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-lg mx-auto lg:mx-0 text-left">
                 <div className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-5 h-5 text-health-primary shrink-0" />
-                  <span className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-dark-muted">
-                    No Typing
+                  <CheckCircle2 className="w-4 h-4 text-health-primary shrink-0" />
+                  <span className="text-xs font-semibold text-gray-700 dark:text-dark-muted">
+                    Voice-first capture
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <WifiOff className="w-5 h-5 text-health-primary shrink-0" />
-                  <span className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-dark-muted">
-                    Offline First
+                  <WifiOff className="w-4 h-4 text-health-primary shrink-0" />
+                  <span className="text-xs font-semibold text-gray-700 dark:text-dark-muted">
+                    Offline-friendly
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Globe2 className="w-5 h-5 text-health-primary shrink-0" />
-                  <span className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-dark-muted">
-                    4 Languages
+                  <Globe2 className="w-4 h-4 text-health-primary shrink-0" />
+                  <span className="text-xs font-semibold text-gray-700 dark:text-dark-muted">
+                    Multilingual voice
                   </span>
                 </div>
               </div>
 
             </div>
 
-            {/* Right Visual Column (5 cols) */}
-            <div className="lg:col-span-5 flex justify-center">
+            {/* Right Visual Column (6 cols on large screens) */}
+            <div className="lg:col-span-6 flex justify-center items-center">
               <AshaHeroIllustration language={language} />
             </div>
 

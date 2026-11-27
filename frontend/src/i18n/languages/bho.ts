@@ -189,13 +189,13 @@ export const bho: TranslationSchema = {
   heroBadge: 'भारत खातिर आवाज से चले वाला स्वास्थ्य रजिस्टर',
   heroHeadline: 'कागजी काम कम।',
   heroHeadlineSub: 'देखभाल ढेर।',
-  heroSupportingText: 'आशा आवाज़ हमनी के आशा दीदी लोग के आपन बोली में बोलके मरीज के रिकॉर्ड डिजिटल रजिस्टर में सहेजे में मदद करेला।',
+  heroSupportingText: 'हर गोठ-बात से, गाँव के हर घर ले अपनत्व से भरल स्वास्थ्य सेवा पहुँचावल।',
   heroCtaPrimary: 'शुरू करीं',
   heroCtaSecondary: 'कइसे काम करेला देखीं',
-  heroVisualTag: 'आवाज से चले वाला फील्ड रजिस्टर',
-  heroCardPreviewTitle: 'सुनीता देवी (7 महीना के गर्भवती)',
-  heroCardPreviewSubtitle: 'बीपी: 150/100 • गोड़ में सूजन',
-  heroCardPreviewDanger: 'खतरा के घंटी: प्री-एक्लेम्पसिया के लक्षण',
+  heroVisualTag: 'सामुदायिक स्वास्थ्य विज़िट',
+  heroCardPreviewTitle: 'घर पर सहज स्वास्थ्य बात-चीत',
+  heroCardPreviewSubtitle: 'रोजाना के जांच आ सहज सहारा',
+  heroCardPreviewDanger: 'आत्मीय देखभाल: घर पर सेहत के जरूरत समझल',
 
   // Landing Page - How It Works
   howItWorksBadge: '3 आसान डग',

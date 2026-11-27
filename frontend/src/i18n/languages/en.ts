@@ -189,13 +189,13 @@ export const en: TranslationSchema = {
   heroBadge: 'Voice-First Healthcare Register for Bharat',
   heroHeadline: 'Less paperwork.',
   heroHeadlineSub: 'More care.',
-  heroSupportingText: 'ASHA Awaaz helps community health workers turn everyday patient conversations into organized healthcare records — simply by speaking in their own language.',
+  heroSupportingText: 'Bringing compassionate healthcare closer to every home, one conversation at a time.',
   heroCtaPrimary: 'Get Started',
   heroCtaSecondary: 'See How It Works',
-  heroVisualTag: 'Voice-Activated Field Register',
-  heroCardPreviewTitle: 'Sunita Devi (7th Month ANC)',
-  heroCardPreviewSubtitle: 'BP: 150/100 mmHg • Swelling in feet',
-  heroCardPreviewDanger: 'High Risk Alert: Preeclampsia signs detected',
+  heroVisualTag: 'Community Health Visit',
+  heroCardPreviewTitle: 'Friendly Home Health Visit',
+  heroCardPreviewSubtitle: 'Routine wellness check and supportive conversation',
+  heroCardPreviewDanger: 'Attentive Care: Understanding health needs at home',
 
   // Landing Page - How It Works
   howItWorksBadge: 'Simple 3-Step Workflow',

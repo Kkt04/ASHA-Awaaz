@@ -189,13 +189,13 @@ export const ta: TranslationSchema = {
   heroBadge: 'பாரதத்திற்கான குரல்வழி சுகாதார பதிவேடு',
   heroHeadline: 'காகிதப் பணி குறைவு.',
   heroHeadlineSub: 'மக்களுக்கு அதிக கவனிப்பு.',
-  heroSupportingText: 'ஆஷா பணியாளர்கள் தங்கள் சொந்த மொழியில் பேசி, அன்றாட மருத்துவ விவரங்களை எளிதாக டிஜிட்டல் பதிவேடாக மாற்ற ஆஷா ஆவாஸ் உதவுகிறது.',
+  heroSupportingText: 'ஒவ்வொரு உரையாடலின் மூலமும் அன்பான சுகாதார சேவையை ஒவ்வொரு வீட்டிற்கும் கொண்டு சேர்த்தல்.',
   heroCtaPrimary: 'தொடங்கவும்',
   heroCtaSecondary: 'செயல்முறை விளக்கம்',
-  heroVisualTag: 'குரல்வழி களப் பதிவேடு',
-  heroCardPreviewTitle: 'சுனிதா தேவி (7வது மாதம் கர்ப்பிணி)',
-  heroCardPreviewSubtitle: 'பிபி: 150/100 • கால்களில் வீக்கம்',
-  heroCardPreviewDanger: 'அபாய எச்சரிக்கை: பிரீக்ளாம்சியா அறிகுறிகள்',
+  heroVisualTag: 'சமூக சுகாதார சந்திப்பு',
+  heroCardPreviewTitle: 'வீட்டில் தோழமையான சுகாதார உரையாடல்',
+  heroCardPreviewSubtitle: 'வழக்கமான நல்வாழ்வு பரிசோதனை',
+  heroCardPreviewDanger: 'கரிசனமிக்க கவனிப்பு: இல்லத்தில் சுகாதார தேவைகளை அறிதல்',
 
   // Landing Page - How It Works
   howItWorksBadge: '3 எளிய படிகள்',
