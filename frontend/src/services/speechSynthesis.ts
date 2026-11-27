@@ -25,7 +25,7 @@ class VoiceSynthesizer {
 
   public speak(
     text: string,
-    language: LanguageCode = 'hi',
+    language: LanguageCode = 'en',
     onEnd?: () => void,
     onError?: (err: any) => void
   ) {

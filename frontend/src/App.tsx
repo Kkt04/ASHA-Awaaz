@@ -66,6 +66,7 @@ export const App: React.FC = () => {
   const [recentVisits, setRecentVisits] = useState<LocalVisitRecord[]>([]);
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [historyFilter, setHistoryFilter] = useState<string>('all');
+  const [historyContextTitle, setHistoryContextTitle] = useState<string | undefined>(undefined);
   const [selectedHistoryVisitId, setSelectedHistoryVisitId] = useState<string | undefined>(undefined);
   const [isDemoModalOpen, setIsDemoModalOpen] = useState<boolean>(false);
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState<boolean>(false);
@@ -404,8 +405,9 @@ export const App: React.FC = () => {
             visits={allVisits}
             pendingSyncCount={pendingSyncCount}
             onStartRecording={handleStartRecording}
-            onViewPatients={(filter) => {
+            onViewPatients={(filter, contextTitle) => {
               setHistoryFilter(filter || 'all');
+              setHistoryContextTitle(contextTitle);
               setSelectedHistoryVisitId(undefined);
               setCurrentScreen('history');
             }}
@@ -508,9 +510,11 @@ export const App: React.FC = () => {
             workerId={currentUser?.worker_id}
             initialFilter={historyFilter}
             initialVisitId={selectedHistoryVisitId}
+            contextTitle={historyContextTitle}
             onBack={() => {
               setSelectedHistoryVisitId(undefined);
               setHistoryFilter('all');
+              setHistoryContextTitle(undefined);
               setCurrentScreen('home');
             }}
           />
@@ -520,6 +524,7 @@ export const App: React.FC = () => {
       {/* Hackathon Demo Mode Modal */}
       <DemoModeModal
         isOpen={isDemoModalOpen}
+        language={language}
         onClose={() => setIsDemoModalOpen(false)}
         onDemoCompleted={async () => {
           await loadMetrics(currentUser?.worker_id);

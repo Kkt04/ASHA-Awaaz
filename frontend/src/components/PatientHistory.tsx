@@ -21,6 +21,7 @@ interface PatientHistoryProps {
   onSelectVisit?: (visit: LocalVisitRecord) => void;
   initialFilter?: string;
   initialVisitId?: string;
+  contextTitle?: string;
 }
 
 export const PatientHistory: React.FC<PatientHistoryProps> = ({
@@ -30,6 +31,7 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
   onSelectVisit,
   initialFilter = 'all',
   initialVisitId,
+  contextTitle,
 }) => {
   const [visits, setVisits] = useState<LocalVisitRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -245,7 +247,7 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
           <span>{t.backToHome}</span>
         </button>
         <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-          {t.patientHistory} ({visits.length})
+          {contextTitle || t.patientHistory} ({visits.length})
         </h2>
       </div>
 
