@@ -2,6 +2,10 @@ import { LanguageCode } from '../types';
 
 export interface RecognitionCallbacks {
   onTranscriptChange: (transcript: string, isFinal: boolean) => void;
+  onAudioStart?: () => void;
+  onSpeechStart?: () => void;
+  onSpeechEnd?: () => void;
+  onAudioEnd?: () => void;
   onSilenceTimeout?: () => void;
   onError?: (error: string) => void;
   onStart?: () => void;
@@ -17,33 +21,15 @@ export class SpeechRecognitionManager {
   private currentCallbacks: RecognitionCallbacks | null = null;
   private restartTimeout: any = null;
 
-  constructor() {
-    this.initRecognition();
-  }
-
-  private initRecognition(): boolean {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) return false;
-
-    try {
-      this.recognition = new SpeechRecognition();
-      this.recognition.continuous = true;
-      this.recognition.interimResults = true;
-      this.recognition.maxAlternatives = 1;
-      return true;
-    } catch (e) {
-      console.warn('SpeechRecognition constructor error:', e);
-      return false;
-    }
-  }
-
   public isSupported(): boolean {
     return Boolean(
       typeof window !== 'undefined' &&
       ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
     );
+  }
+
+  public getIsListening(): boolean {
+    return this.isListening;
   }
 
   public static async requestMicrophonePermission(): Promise<{ granted: boolean; error?: string }> {
@@ -69,6 +55,34 @@ export class SpeechRecognitionManager {
     }
   }
 
+  private cleanPreviousInstance() {
+    if (this.restartTimeout) {
+      clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
+    }
+    if (this.silenceTimer) {
+      clearTimeout(this.silenceTimer);
+      this.silenceTimer = null;
+    }
+
+    if (this.recognition) {
+      // Nullify all listeners so old asynchronous events never clash with the new session
+      this.recognition.onstart = null;
+      this.recognition.onaudiostart = null;
+      this.recognition.onspeechstart = null;
+      this.recognition.onspeechend = null;
+      this.recognition.onaudioend = null;
+      this.recognition.onresult = null;
+      this.recognition.onerror = null;
+      this.recognition.onend = null;
+
+      try {
+        this.recognition.abort();
+      } catch {}
+      this.recognition = null;
+    }
+  }
+
   public start(
     language: LanguageCode,
     callbacks: RecognitionCallbacks
@@ -78,9 +92,10 @@ export class SpeechRecognitionManager {
       return;
     }
 
-    // Clean up any lingering recognition before starting fresh
-    this.stop();
+    // Clean up any previous recognition instance thoroughly
+    this.cleanPreviousInstance();
 
+    this.isListening = true;
     this.currentLanguage = language;
     this.currentCallbacks = callbacks;
     this.fullTranscript = '';
@@ -88,66 +103,101 @@ export class SpeechRecognitionManager {
     const langCode =
       language === 'ta' ? 'ta-IN' : language === 'en' ? 'en-IN' : 'hi-IN';
 
-    // Re-instantiate to avoid InvalidStateError in Chrome/WebKit
-    this.initRecognition();
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    if (!this.recognition) {
-      callbacks.onError?.('Could not initialize speech recognition.');
+    try {
+      this.recognition = new SpeechRecognition();
+      this.recognition.continuous = true;
+      this.recognition.interimResults = true;
+      this.recognition.maxAlternatives = 1;
+      this.recognition.lang = langCode;
+    } catch (e: any) {
+      this.isListening = false;
+      callbacks.onError?.(e?.message || 'Could not initialize speech recognition');
       return;
     }
 
-    this.recognition.lang = langCode;
-
     const resetSilenceTimer = () => {
       if (this.silenceTimer) clearTimeout(this.silenceTimer);
-      // 8 seconds of no speech detected
       this.silenceTimer = setTimeout(() => {
         if (this.isListening && this.fullTranscript.trim().length === 0) {
           callbacks.onSilenceTimeout?.();
         }
-      }, 8000);
+      }, 10000);
     };
 
+    // 1. Session started
     this.recognition.onstart = () => {
       this.isListening = true;
       callbacks.onStart?.();
       resetSilenceTimer();
     };
 
+    // 2. Audio capturing has physically begun (Hardware microphone is live)
+    this.recognition.onaudiostart = () => {
+      callbacks.onAudioStart?.();
+    };
+
+    // 3. User started speaking (Human speech detected in audio stream)
+    this.recognition.onspeechstart = () => {
+      callbacks.onSpeechStart?.();
+      resetSilenceTimer();
+    };
+
+    // 4. User stopped speaking
+    this.recognition.onspeechend = () => {
+      callbacks.onSpeechEnd?.();
+    };
+
+    // 5. Audio capturing ended
+    this.recognition.onaudioend = () => {
+      callbacks.onAudioEnd?.();
+    };
+
+    // 6. Speech transcribed into text
     this.recognition.onresult = (event: any) => {
       resetSilenceTimer();
-      let interim = '';
 
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          this.fullTranscript += event.results[i][0].transcript + ' ';
+      let finalTrans = '';
+      let interimTrans = '';
+
+      for (let i = 0; i < event.results.length; ++i) {
+        const item = event.results[i];
+        if (item.isFinal) {
+          finalTrans += item[0].transcript + ' ';
         } else {
-          interim += event.results[i][0].transcript;
+          interimTrans += item[0].transcript;
         }
       }
 
+      this.fullTranscript = finalTrans;
+      const combined = (finalTrans + interimTrans).trim();
+
       callbacks.onTranscriptChange(
-        (this.fullTranscript + interim).trim(),
-        false
+        combined,
+        interimTrans.length === 0 && finalTrans.length > 0
       );
     };
 
+    // 7. Error handling
     this.recognition.onerror = (event: any) => {
-      console.warn('Speech recognition error event:', event.error);
-      if (event.error === 'no-speech') {
+      console.warn('Speech recognition event notice:', event.error);
+      const err = event.error;
+
+      if (err === 'no-speech') {
         callbacks.onSilenceTimeout?.();
         return;
       }
-      if (event.error === 'aborted') {
-        // Normal when stopped programmatically
+      if (err === 'aborted') {
         return;
       }
 
-      // Fatal errors: stop listening so onend does not loop endlessly
+      // Fatal errors: stop listening immediately to avoid infinite restart loop
       if (
-        event.error === 'not-allowed' ||
-        event.error === 'service-not-allowed' ||
-        event.error === 'audio-capture'
+        err === 'not-allowed' ||
+        err === 'service-not-allowed' ||
+        err === 'audio-capture'
       ) {
         this.isListening = false;
         if (this.restartTimeout) {
@@ -156,22 +206,23 @@ export class SpeechRecognitionManager {
         }
       }
 
-      callbacks.onError?.(event.error);
+      callbacks.onError?.(err);
     };
 
+    // 8. Session end
     this.recognition.onend = () => {
-      // If recognition stopped unexpectedly while we were intentionally listening, auto-restart with a safety throttle
       if (this.isListening && this.currentCallbacks) {
+        // If we are supposed to be listening (e.g. continuous mode paused between sentences), restart cleanly
         if (this.restartTimeout) clearTimeout(this.restartTimeout);
         this.restartTimeout = setTimeout(() => {
           if (this.isListening && this.recognition) {
             try {
               this.recognition.start();
             } catch (err) {
-              console.warn('Auto-restart recognition notice:', err);
+              console.warn('Recognition auto-resume notice:', err);
             }
           }
-        }, 200);
+        }, 150);
       } else {
         this.isListening = false;
         if (this.silenceTimer) clearTimeout(this.silenceTimer);
@@ -185,17 +236,15 @@ export class SpeechRecognitionManager {
     } catch (e: any) {
       console.warn('Recognition start exception:', e);
       if (e.name === 'InvalidStateError') {
-        // If already started, stop and retry once
-        try {
-          this.recognition.stop();
-          setTimeout(() => {
-            try {
-              this.recognition.start();
-            } catch {}
-          }, 100);
-        } catch {}
+        // Already started or busy, retry after short delay
+        setTimeout(() => {
+          if (this.isListening && this.recognition) {
+            try { this.recognition.start(); } catch {}
+          }
+        }, 200);
       } else {
-        callbacks.onError?.(e.message || 'Could not start microphone');
+        this.isListening = false;
+        callbacks.onError?.(e?.message || 'Could not start microphone');
       }
     }
   }
@@ -203,25 +252,7 @@ export class SpeechRecognitionManager {
   public stop() {
     this.isListening = false;
     this.currentCallbacks = null;
-
-    if (this.restartTimeout) {
-      clearTimeout(this.restartTimeout);
-      this.restartTimeout = null;
-    }
-    if (this.silenceTimer) {
-      clearTimeout(this.silenceTimer);
-      this.silenceTimer = null;
-    }
-
-    if (this.recognition) {
-      try {
-        this.recognition.stop();
-      } catch (err) {
-        try {
-          this.recognition.abort();
-        } catch {}
-      }
-    }
+    this.cleanPreviousInstance();
   }
 }
 

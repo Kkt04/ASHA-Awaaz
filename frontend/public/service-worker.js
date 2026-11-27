@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asha-awaaz-v2';
+const CACHE_NAME = 'asha-awaaz-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

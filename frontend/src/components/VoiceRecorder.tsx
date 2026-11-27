@@ -75,34 +75,48 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       return;
     }
 
-    // Step 1: Check and request microphone permission before starting recognition
-    const permResult = await SpeechRecognitionManager.requestMicrophonePermission();
-    if (!permResult.granted) {
-      if (permResult.error === 'not-allowed') {
-        setPermissionState('denied');
-        setErrorMessage('Microphone access is blocked. Please allow microphone permission in your browser address bar.');
-      } else if (permResult.error === 'no-device') {
-        setPermissionState('no-device');
-        setErrorMessage('No microphone found on this device. You can type or use quick sample presets below.');
-      } else {
-        setPermissionState('denied');
-        setErrorMessage(`Microphone error: ${permResult.error || 'Permission error'}.`);
+    // Step 1: Initialize audio meter and acquire microphone stream safely
+    const hasAudio = await audioMeter.start(
+      (level, isLoud, isSpeaking) => {
+        setAudioLevel(level);
+        setIsLoudNoise(isLoud);
+        if (isSpeaking) setIsSpeakingNow(true);
+      },
+      (err) => {
+        console.warn('Audio meter error:', err);
+        const name = err?.name || '';
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+          setPermissionState('denied');
+          setErrorMessage('Microphone access is blocked. Please allow microphone access in your browser address bar, then click Retry.');
+        } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+          setPermissionState('no-device');
+          setErrorMessage('No microphone detected on this device. You can type or use one-tap presets below.');
+        } else {
+          setPermissionState('denied');
+          setErrorMessage(`Microphone error: ${err?.message || 'Access issue'}.`);
+        }
+        setShowManualFallback(true);
       }
-      setShowManualFallback(true);
+    );
+
+    if (!hasAudio) {
+      // Permission denied or devices not available
       return;
     }
 
     setPermissionState('granted');
 
-    // Step 2: Start Audio Level meter (reacts dynamically to user voice volume)
-    audioMeter.start((level, isLoud, isSpeaking) => {
-      setAudioLevel(level);
-      setIsLoudNoise(isLoud);
-      setIsSpeakingNow(isSpeaking);
-    });
-
-    // Step 3: Start Web Speech Recognition
+    // Step 2: Start Web Speech Recognition with full lifecycle event listeners
     speechRecognitionManager.start(language, {
+      onAudioStart: () => {
+        // Physical microphone is capturing audio
+      },
+      onSpeechStart: () => {
+        setIsSpeakingNow(true);
+      },
+      onSpeechEnd: () => {
+        setIsSpeakingNow(false);
+      },
       onTranscriptChange: (text) => {
         setTranscript(text);
         transcriptRef.current = text;
@@ -122,7 +136,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
           setErrorMessage('Microphone hardware is busy or unavailable.');
           setShowManualFallback(true);
         } else if (err === 'network') {
-          setErrorMessage('Speech recognition network error. You can continue speaking or edit the text manually.');
+          setErrorMessage('Speech recognition connection notice. You can continue speaking or edit the text manually.');
         }
       },
     });
