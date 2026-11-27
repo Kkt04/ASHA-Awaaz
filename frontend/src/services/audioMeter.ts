@@ -7,9 +7,12 @@ export class AudioMeter {
   private animationFrameId: number | null = null;
 
   public async start(
-    onLevelChange: (volume: number, isLoudNoise: boolean) => void
+    onLevelChange: (volume: number, isLoudNoise: boolean, isSpeaking: boolean) => void,
+    onError?: (err: any) => void
   ): Promise<boolean> {
     try {
+      this.stop();
+
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx || !navigator.mediaDevices?.getUserMedia) {
         return false;
@@ -24,9 +27,19 @@ export class AudioMeter {
       });
 
       this.audioContext = new AudioCtx();
+      
+      // Handle suspended audio context (browser autoplay policies)
+      if (this.audioContext.state === 'suspended') {
+        try {
+          await this.audioContext.resume();
+        } catch {
+          // Will resume upon user touch
+        }
+      }
+
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = 256;
-      this.analyser.smoothingTimeConstant = 0.5;
+      this.analyser.smoothingTimeConstant = 0.4;
 
       this.microphone = this.audioContext.createMediaStreamSource(this.stream);
       this.microphone.connect(this.analyser);
@@ -39,15 +52,23 @@ export class AudioMeter {
 
         this.analyser.getByteFrequencyData(dataArray);
         let sum = 0;
+        let peak = 0;
         for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
+          const val = dataArray[i];
+          sum += val;
+          if (val > peak) peak = val;
         }
-        const average = sum / dataArray.length; // 0 to 255
+
+        const average = sum / dataArray.length;
+        // Normalize 0-100 with a natural perceptual curve
         const normalized = Math.min(100, Math.round((average / 128) * 100));
         
-        // Loud noise threshold (e.g. noisy village street / market)
-        const isLoud = normalized > 75;
-        onLevelChange(normalized, isLoud);
+        // Human speech typically registers above ~12% volume on normalized scale
+        const isSpeaking = normalized > 12;
+        // Loud ambient noise threshold (e.g. noisy bazaar or traffic > 78%)
+        const isLoud = normalized > 78;
+
+        onLevelChange(normalized, isLoud, isSpeaking);
 
         this.animationFrameId = requestAnimationFrame(checkVolume);
       };
@@ -55,7 +76,8 @@ export class AudioMeter {
       checkVolume();
       return true;
     } catch (err) {
-      console.warn('Microphone audio meter access denied or not available:', err);
+      console.warn('AudioMeter getUserMedia error:', err);
+      onError?.(err);
       return false;
     }
   }
@@ -67,13 +89,25 @@ export class AudioMeter {
       this.animationFrameId = null;
     }
     if (this.stream) {
-      this.stream.getTracks().forEach((track) => track.stop());
+      this.stream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {}
+      });
       this.stream = null;
     }
     if (this.audioContext) {
-      this.audioContext.close().catch(() => {});
+      try {
+        this.audioContext.close().catch(() => {});
+      } catch {}
       this.audioContext = null;
     }
+    this.analyser = null;
+    this.microphone = null;
+  }
+
+  public getIsRunning(): boolean {
+    return this.isRunning;
   }
 }
 

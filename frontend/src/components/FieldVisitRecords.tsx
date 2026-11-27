@@ -99,7 +99,10 @@ export const FieldVisitRecords: React.FC<FieldVisitRecordsProps> = ({
         ? 'मरीज के नाम भा दौरा बोलीं।'
         : 'मरीज़ का नाम या दौरा बोलिए।';
 
-    voiceSynthesizer.speak(searchPrompt, language, () => {
+    let hasStarted = false;
+    const triggerStart = () => {
+      if (hasStarted) return;
+      hasStarted = true;
       speechRecognitionManager.start(language, {
         onTranscriptChange: (text, isFinal) => {
           const clean = text
@@ -114,8 +117,14 @@ export const FieldVisitRecords: React.FC<FieldVisitRecordsProps> = ({
         onError: () => {
           setIsVoiceSearching(false);
         },
+        onEnd: () => {
+          setIsVoiceSearching(false);
+        },
       });
-    });
+    };
+
+    voiceSynthesizer.speak(searchPrompt, language, triggerStart);
+    setTimeout(triggerStart, 850);
   };
 
   const filteredVisits = visits.filter((v) => {

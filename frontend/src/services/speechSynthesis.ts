@@ -36,11 +36,15 @@ class VoiceSynthesizer {
     }
 
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      if (onEnd) onEnd();
+      return;
+    }
 
     // Deduplication check: prevent speaking the exact same instruction twice within 1500ms
     const now = Date.now();
     if (trimmed === this.lastSpokenText && now - this.lastSpokenTime < 1500) {
+      if (onEnd) onEnd();
       return;
     }
     this.lastSpokenText = trimmed;

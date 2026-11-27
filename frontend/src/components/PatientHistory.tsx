@@ -80,7 +80,10 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
         ? 'मरीज के नाम बोलीं।'
         : 'मरीज़ का नाम बोलिए।';
 
-    voiceSynthesizer.speak(searchPrompt, language, () => {
+    let hasStarted = false;
+    const triggerStart = () => {
+      if (hasStarted) return;
+      hasStarted = true;
       speechRecognitionManager.start(language, {
         onTranscriptChange: (text, isFinal) => {
           // Clean common auxiliary search phrases
@@ -96,8 +99,14 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
         onError: () => {
           setIsVoiceSearching(false);
         },
+        onEnd: () => {
+          setIsVoiceSearching(false);
+        },
       });
-    });
+    };
+
+    voiceSynthesizer.speak(searchPrompt, language, triggerStart);
+    setTimeout(triggerStart, 850);
   };
 
   const filteredVisits = visits.filter((v) => {

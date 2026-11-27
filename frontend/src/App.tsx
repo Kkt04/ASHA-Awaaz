@@ -258,7 +258,13 @@ export const App: React.FC = () => {
   };
 
   const handleFinishRecording = async (transcript: string) => {
-    setCurrentTranscript(transcript);
+    const clean = transcript.trim();
+    if (!clean) {
+      console.warn('Cannot process empty transcript');
+      return;
+    }
+
+    setCurrentTranscript(clean);
     setIsProcessing(true);
 
     try {

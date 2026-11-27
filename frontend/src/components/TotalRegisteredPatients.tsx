@@ -108,7 +108,10 @@ export const TotalRegisteredPatients: React.FC<TotalRegisteredPatientsProps> = (
         ? 'मरीज के नाम बोलीं।'
         : 'मरीज़ का नाम बोलिए।';
 
-    voiceSynthesizer.speak(searchPrompt, language, () => {
+    let hasStarted = false;
+    const triggerStart = () => {
+      if (hasStarted) return;
+      hasStarted = true;
       speechRecognitionManager.start(language, {
         onTranscriptChange: (text, isFinal) => {
           const clean = text
@@ -123,8 +126,14 @@ export const TotalRegisteredPatients: React.FC<TotalRegisteredPatientsProps> = (
         onError: () => {
           setIsVoiceSearching(false);
         },
+        onEnd: () => {
+          setIsVoiceSearching(false);
+        },
       });
-    });
+    };
+
+    voiceSynthesizer.speak(searchPrompt, language, triggerStart);
+    setTimeout(triggerStart, 850);
   };
 
   const filteredPatients = patients.filter((p) => {

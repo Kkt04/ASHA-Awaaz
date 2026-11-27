@@ -110,6 +110,9 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
       onError: () => {
         setIsListeningForCorrection(false);
       },
+      onEnd: () => {
+        setIsListeningForCorrection(false);
+      },
     });
   };
 
