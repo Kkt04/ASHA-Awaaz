@@ -196,6 +196,12 @@ export const ta: TranslationSchema = {
   heroCardPreviewTitle: 'வீட்டில் தோழமையான சுகாதார உரையாடல்',
   heroCardPreviewSubtitle: 'வழக்கமான நல்வாழ்வு பரிசோதனை',
   heroCardPreviewDanger: 'கரிசனமிக்க கவனிப்பு: இல்லத்தில் சுகாதார தேவைகளை அறிதல்',
+  heroConvoSpeakerAsha: 'ஆஷா பணியாளர்',
+  heroConvoSpeakerWoman: 'சமூகப் பெண்',
+  heroConvoAsha1: 'வணக்கம்! நான் ஆஷா அறக்கட்டளையிலிருந்து வந்திருக்கிறேன். இன்று உங்கள் உடல்நலத்தைப் பற்றி விசாரிக்க வந்துள்ளேன்.',
+  heroConvoWoman1: 'வணக்கம்! நான் நன்றாக இருக்கிறேன். வீட்டிற்கு வந்து விசாரித்ததற்கு நன்றி.',
+  heroConvoAsha2: 'மகிழ்ச்சி! உடல்நிலை சீராக உள்ளதா? ஏதேனும் கேட்க விரும்புகிறீர்களா?',
+  heroConvoWoman2: 'ஆம், என் உடல்நலம் குறித்து உங்களிடம் சில ஆலோசனைகள் கேட்க வேண்டும்...',
 
   // Landing Page - How It Works
   howItWorksBadge: '3 எளிய படிகள்',

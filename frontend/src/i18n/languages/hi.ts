@@ -196,6 +196,12 @@ export const hi: TranslationSchema = {
   heroCardPreviewTitle: 'घर पर आत्मीय स्वास्थ्य संवाद',
   heroCardPreviewSubtitle: 'नियमित स्वास्थ्य जांच और सहज बातचीत',
   heroCardPreviewDanger: 'संवेदनशील देखभाल: घर पर स्वास्थ्य आवश्यकताओं को समझना',
+  heroConvoSpeakerAsha: 'आशा दीदी',
+  heroConvoSpeakerWoman: 'गाँव की महिला',
+  heroConvoAsha1: 'नमस्ते! मैं आशा फाउंडेशन से आई हूँ। आज मैं आपका हालचाल जानने आई हूँ।',
+  heroConvoWoman1: 'नमस्ते! मैं ठीक हूँ। घर आने के लिए बहुत-बहुत धन्यवाद।',
+  heroConvoAsha2: 'बहुत अच्छा! आप बिल्कुल ठीक महसूस कर रही हैं ना? कोई परेशानी तो नहीं है?',
+  heroConvoWoman2: 'हाँ दीदी, मुझे अपनी सेहत के बारे में आपसे कुछ पूछना था...',
 
   // Landing Page - How It Works
   howItWorksBadge: '3 आसान चरण',

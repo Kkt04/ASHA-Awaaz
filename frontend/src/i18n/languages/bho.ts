@@ -196,6 +196,12 @@ export const bho: TranslationSchema = {
   heroCardPreviewTitle: 'घर पर सहज स्वास्थ्य बात-चीत',
   heroCardPreviewSubtitle: 'रोजाना के जांच आ सहज सहारा',
   heroCardPreviewDanger: 'आत्मीय देखभाल: घर पर सेहत के जरूरत समझल',
+  heroConvoSpeakerAsha: 'आशा दीदी',
+  heroConvoSpeakerWoman: 'गाँव के दीदी',
+  heroConvoAsha1: 'प्रणाम! हम आशा फाउंडेशन से आईल बानी। आज रउआ के हालचाल पूछे आइल बानी।',
+  heroConvoWoman1: 'प्रणाम दीदी! हम ठीक बानी। घरे आवे खातिर बहुत-बहुत धन्यवाद।',
+  heroConvoAsha2: 'बहुत बढ़िया! तबियत-पानी सब ठीक बा ना? कुछ पूछे के बा का?',
+  heroConvoWoman2: 'हँ दीदी, हमरा आपन सेहत के लेके रउआ से कुछ सलाह लेवे के रहल...',
 
   // Landing Page - How It Works
   howItWorksBadge: '3 आसान डग',

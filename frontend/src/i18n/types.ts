@@ -168,6 +168,12 @@ export interface TranslationSchema {
   heroCardPreviewTitle: string;
   heroCardPreviewSubtitle: string;
   heroCardPreviewDanger: string;
+  heroConvoSpeakerAsha: string;
+  heroConvoSpeakerWoman: string;
+  heroConvoAsha1: string;
+  heroConvoWoman1: string;
+  heroConvoAsha2: string;
+  heroConvoWoman2: string;
 
   // Landing Page - How It Works
   howItWorksBadge: string;

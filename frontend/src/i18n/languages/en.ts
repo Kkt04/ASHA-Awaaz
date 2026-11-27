@@ -196,6 +196,12 @@ export const en: TranslationSchema = {
   heroCardPreviewTitle: 'Friendly Home Health Visit',
   heroCardPreviewSubtitle: 'Routine wellness check and supportive conversation',
   heroCardPreviewDanger: 'Attentive Care: Understanding health needs at home',
+  heroConvoSpeakerAsha: 'ASHA Worker',
+  heroConvoSpeakerWoman: 'Community Member',
+  heroConvoAsha1: "Namaste! I'm from ASHA Foundation. I'm here to check how you're doing today.",
+  heroConvoWoman1: "Namaste! I'm doing well. Thank you for visiting.",
+  heroConvoAsha2: "That's lovely! Have you been feeling okay? Is there anything you'd like to discuss?",
+  heroConvoWoman2: "I wanted to ask you something about my health...",
 
   // Landing Page - How It Works
   howItWorksBadge: 'Simple 3-Step Workflow',
