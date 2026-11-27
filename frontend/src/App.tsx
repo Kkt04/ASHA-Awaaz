@@ -24,13 +24,14 @@ import { VisitCard } from './components/VisitCard';
 import { RiskBanner } from './components/RiskBanner';
 import { VoiceConfirmation } from './components/VoiceConfirmation';
 import { PatientHistory } from './components/PatientHistory';
+import { AuthenticatedDashboard } from './components/AuthenticatedDashboard';
 import { DemoModeModal } from './components/DemoModeModal';
 import { SignOutConfirmModal } from './components/SignOutConfirmModal';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { seedLocalDemoPatients, db } from './db/dexie';
-import { extractVisitVoice, evaluateRisk, saveVisitRecord } from './services/api';
+import { extractVisitVoice, evaluateRisk, saveVisitRecord, syncPendingVisits } from './services/api';
 import { voiceSynthesizer } from './services/speechSynthesis';
 import { authService, WorkerUser } from './services/auth';
 
@@ -59,10 +60,13 @@ export const App: React.FC = () => {
   const isSavingRef = React.useRef<boolean>(false);
 
   // Home metrics & Modals
+  const [allVisits, setAllVisits] = useState<LocalVisitRecord[]>([]);
   const [totalVisits, setTotalVisits] = useState<number>(0);
   const [highRiskCount, setHighRiskCount] = useState<number>(0);
   const [recentVisits, setRecentVisits] = useState<LocalVisitRecord[]>([]);
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  const [historyFilter, setHistoryFilter] = useState<string>('all');
+  const [selectedHistoryVisitId, setSelectedHistoryVisitId] = useState<string | undefined>(undefined);
   const [isDemoModalOpen, setIsDemoModalOpen] = useState<boolean>(false);
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -133,6 +137,7 @@ export const App: React.FC = () => {
     try {
       const workerId = targetWorkerId || currentUser?.worker_id;
       if (!workerId) {
+        setAllVisits([]);
         setTotalVisits(0);
         setHighRiskCount(0);
         setRecentVisits([]);
@@ -141,12 +146,12 @@ export const App: React.FC = () => {
       }
 
       // Query only records belonging to the authenticated worker
-      const userVisits = await db.visits.where('worker_id').equals(workerId).toArray();
+      const userVisits = await db.visits.where('worker_id').equals(workerId).reverse().sortBy('created_at');
+      setAllVisits(userVisits);
       setTotalVisits(userVisits.length);
       const highRisk = userVisits.filter((v) => v.risk_evaluation?.is_high_risk).length;
       setHighRiskCount(highRisk);
-      const recents = await db.visits.where('worker_id').equals(workerId).reverse().sortBy('created_at');
-      setRecentVisits(recents.slice(0, 5));
+      setRecentVisits(userVisits.slice(0, 5));
       const pending = await db.visits
         .where('worker_id')
         .equals(workerId)
@@ -387,153 +392,38 @@ export const App: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-xl w-full mx-auto pb-12">
+      <main className={`flex-1 w-full mx-auto pb-12 transition-all ${
+        currentScreen === 'home' ? 'max-w-5xl px-4 sm:px-6 pt-2' : 'max-w-2xl px-4 pt-2'
+      }`}>
         
         {/* ================= Screen: HOME DASHBOARD ================= */}
         {currentScreen === 'home' && (
-          <div className="p-4 space-y-5 text-center">
-            
-            {/* Top Status & Demo Mode banner */}
-            <div className="flex items-center justify-between pt-1">
-              <div className="text-left">
-                <span className="text-xs font-bold text-gray-500 dark:text-dark-muted uppercase tracking-wider block">
-                  {currentUser ? currentUser.role : 'ASHA Health Worker'}
-                </span>
-                <span className="text-sm font-black text-gray-900 dark:text-white">
-                  {currentUser ? currentUser.name : t.workerGreeting}
-                </span>
-              </div>
-
-              {/* Demo Mode trigger */}
-              <button
-                type="button"
-                onClick={() => setIsDemoModalOpen(true)}
-                className="py-1.5 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-xs font-bold text-health-dark dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900 flex items-center space-x-1.5 touch-target shadow-sm"
-              >
-                <Sparkles className="w-4 h-4 text-emerald-700 dark:text-emerald-400 animate-spin" />
-                <span>{t.demoModeBtn}</span>
-              </button>
-            </div>
-
-            {/* Quick Metrics Bar */}
-            <div className="grid grid-cols-3 gap-2 text-left">
-              <div className="bg-white dark:bg-dark-card p-3 rounded-2xl border border-health-mintborder dark:border-dark-border shadow-card dark:shadow-darkcard">
-                <span className="text-[11px] font-bold text-gray-500 dark:text-dark-muted block">
-                  {t.totalVisits}
-                </span>
-                <span className="text-xl font-extrabold text-health-dark dark:text-emerald-400">
-                  {totalVisits}
-                </span>
-              </div>
-
-              <div className="bg-white dark:bg-dark-card p-3 rounded-2xl border border-red-200 dark:border-red-900 shadow-card dark:shadow-darkcard">
-                <span className="text-[11px] font-bold text-red-600 dark:text-red-400 block">
-                  {t.highRiskCases}
-                </span>
-                <span className="text-xl font-extrabold text-red-700 dark:text-red-400">
-                  {highRiskCount}
-                </span>
-              </div>
-
-              <button
-                onClick={() => setCurrentScreen('history')}
-                className="bg-white dark:bg-dark-card p-3 rounded-2xl border border-emerald-200 dark:border-dark-border shadow-card dark:shadow-darkcard hover:bg-emerald-50 dark:hover:bg-dark-surface active:scale-[0.98] transition-all touch-target text-left"
-              >
-                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 block">
-                  {t.patientHistory}
-                </span>
-                <span className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center mt-1">
-                  {t.viewAll} <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
-                </span>
-              </button>
-            </div>
-
-            {/* Huge Central Microphone Button */}
-            <div className="py-6 flex flex-col items-center justify-center">
-              <button
-                onClick={handleStartRecording}
-                className="w-40 h-40 rounded-full bg-health-dark hover:bg-health-primary active:scale-95 transition-all shadow-elevated text-white flex flex-col items-center justify-center space-y-2 border-4 border-emerald-300/60 touch-target group"
-                aria-label={t.speakVisitButton}
-              >
-                <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Mic className="w-10 h-10 stroke-[2.5]" />
-                </div>
-                <span className="text-xs font-bold uppercase tracking-wider text-green-100">
-                  {t.tapToRecord}
-                </span>
-              </button>
-
-              <h3 className="text-2xl font-black text-gray-900 dark:text-white mt-5 tracking-tight">
-                {t.speakVisitButton}
-              </h3>
-              <p className="text-sm font-semibold text-gray-600 dark:text-dark-muted mt-1">
-                {t.speakVisitSub}
-              </p>
-            </div>
-
-            {/* Example Spoken Prompt Guide */}
-            <div className="bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-850 rounded-2xl p-3.5 text-left text-xs space-y-1">
-              <span className="font-bold text-emerald-900 dark:text-emerald-300 block">
-                💡 {t.examplePromptTitle}
-              </span>
-              <p className="text-gray-700 dark:text-dark-muted font-medium italic">
-                {t.examplePromptText}
-              </p>
-            </div>
-
-            {/* Recent Visits Section */}
-            <div className="text-left pt-2">
-              <div className="flex items-center justify-between mb-2.5">
-                <h4 className="text-sm font-extrabold text-gray-800 dark:text-gray-200 uppercase tracking-wide">
-                  {t.recentVisits}
-                </h4>
-                <button
-                  onClick={() => setCurrentScreen('history')}
-                  className="text-xs text-health-primary dark:text-emerald-400 font-bold hover:underline"
-                >
-                  {t.viewAll} ({totalVisits})
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                {recentVisits.length === 0 ? (
-                  <p className="text-xs text-gray-500 dark:text-dark-muted py-3 text-center bg-white dark:bg-dark-card rounded-xl border border-gray-200 dark:border-dark-border">
-                    {t.noRecentVisits}
-                  </p>
-                ) : (
-                  recentVisits.map((v) => {
-                    const isDanger = v.risk_evaluation?.is_high_risk;
-                    return (
-                      <div
-                        key={v.visit_id}
-                        onClick={() => setCurrentScreen('history')}
-                        className={`p-3 rounded-xl bg-white dark:bg-dark-card border shadow-sm flex items-center justify-between cursor-pointer hover:border-health-primary dark:hover:border-emerald-500 transition-colors touch-target ${
-                          isDanger ? 'border-red-300 dark:border-red-900 bg-red-50/20 dark:bg-red-950/20' : 'border-gray-200 dark:border-dark-border'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <span className="font-bold text-gray-900 dark:text-white text-sm">
-                              {v.patient_name}
-                            </span>
-                            {isDanger && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-300">
-                                ⚠️ {t.highRiskCases}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[11px] text-gray-500 dark:text-dark-muted line-clamp-1 italic">
-                            "{v.original_transcript}"
-                          </span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
+          <AuthenticatedDashboard
+            language={language}
+            currentUser={currentUser}
+            visits={allVisits}
+            pendingSyncCount={pendingSyncCount}
+            onStartRecording={handleStartRecording}
+            onViewPatients={(filter) => {
+              setHistoryFilter(filter || 'all');
+              setSelectedHistoryVisitId(undefined);
+              setCurrentScreen('history');
+            }}
+            onSelectVisit={(visitId) => {
+              setSelectedHistoryVisitId(visitId);
+              setCurrentScreen('history');
+            }}
+            onOpenDemoModal={() => setIsDemoModalOpen(true)}
+            onSyncNow={async () => {
+              const res = await syncPendingVisits();
+              if (res.synced > 0) {
+                showToast(`Synced ${res.synced} record(s) to cloud.`);
+              } else {
+                showToast('Records are up to date.');
+              }
+              await loadMetrics(currentUser?.worker_id);
+            }}
+          />
         )}
 
         {/* ================= Screen: RECORDING ================= */}
@@ -616,7 +506,13 @@ export const App: React.FC = () => {
           <PatientHistory
             language={language}
             workerId={currentUser?.worker_id}
-            onBack={() => setCurrentScreen('home')}
+            initialFilter={historyFilter}
+            initialVisitId={selectedHistoryVisitId}
+            onBack={() => {
+              setSelectedHistoryVisitId(undefined);
+              setHistoryFilter('all');
+              setCurrentScreen('home');
+            }}
           />
         )}
       </main>

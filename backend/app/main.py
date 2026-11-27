@@ -1,6 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database.mongodb import db_manager
@@ -28,14 +31,60 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Enable CORS for frontend PWA
+# Enable CORS for frontend PWA across all dev and production preview URLs
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=r"^https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "status_code": exc.status_code,
+            "detail": exc.detail,
+            "message": str(exc.detail)
+        }
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    first_msg = errors[0].get("msg", "Invalid request parameters") if errors else "Validation failed"
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "success": False,
+            "status_code": 422,
+            "detail": first_msg,
+            "message": first_msg,
+            "errors": [
+                {"loc": list(err.get("loc", [])), "msg": err.get("msg", ""), "type": err.get("type", "")}
+                for err in errors
+            ]
+        }
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled server error on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "success": False,
+            "status_code": 500,
+            "detail": "Internal server error. Please try again shortly.",
+            "message": "The server encountered an unexpected error. Please try again."
+        }
+    )
 
 # Root health endpoint
 app.include_router(health.router)

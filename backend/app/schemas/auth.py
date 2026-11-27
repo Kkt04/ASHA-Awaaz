@@ -28,6 +28,8 @@ class UserLoginRequest(BaseModel):
 
 
 class AuthResponse(BaseModel):
+    success: bool = True
+    message: str = "Authentication successful"
     access_token: str
     token_type: str = "bearer"
     worker: WorkerProfile

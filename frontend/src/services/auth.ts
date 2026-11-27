@@ -1,3 +1,5 @@
+import { parseApiResponse, formatNetworkError } from './apiUtils';
+
 const rawApiBase: string = (import.meta as any).env?.VITE_API_BASE_URL || '/api/v1';
 export const API_BASE = rawApiBase.endsWith('/api/v1') 
   ? rawApiBase 
@@ -80,17 +82,18 @@ export const authService = {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || 'Invalid email or password. Please check your credentials.');
+      const parsed = await parseApiResponse<AuthSuccessPayload>(res);
+      if (!parsed.ok || !parsed.data) {
+        throw new Error(parsed.error || 'Invalid email or password. Please check your credentials.');
       }
 
+      const data = parsed.data;
       if (data?.access_token) {
         this.setSession(data.access_token, data.worker);
       }
       return data;
     } catch (err: any) {
-      throw new Error(err.message || 'Failed to connect to authentication service.');
+      throw new Error(formatNetworkError(err));
     }
   },
 
@@ -101,17 +104,18 @@ export const authService = {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || 'Demo login failed.');
+      const parsed = await parseApiResponse<AuthSuccessPayload>(res);
+      if (!parsed.ok || !parsed.data) {
+        throw new Error(parsed.error || 'Demo login failed. Please try again.');
       }
 
+      const data = parsed.data;
       if (data?.access_token) {
         this.setSession(data.access_token, data.worker);
       }
       return data;
     } catch (err: any) {
-      throw new Error(err.message || 'Demo authentication service could not be reached.');
+      throw new Error(formatNetworkError(err));
     }
   },
 
@@ -126,17 +130,18 @@ export const authService = {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || 'Registration failed. Please check the entered details.');
+      const parsed = await parseApiResponse<AuthSuccessPayload>(res);
+      if (!parsed.ok || !parsed.data) {
+        throw new Error(parsed.error || 'Registration failed. Please check the entered details.');
       }
 
+      const data = parsed.data;
       if (data?.access_token) {
         this.setSession(data.access_token, data.worker);
       }
       return data;
     } catch (err: any) {
-      throw new Error(err.message || 'Registration service could not be reached.');
+      throw new Error(formatNetworkError(err));
     }
   },
 
@@ -148,10 +153,10 @@ export const authService = {
       const res = await fetch(`${API_BASE}/worker/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) {
-        const user = await res.json();
-        localStorage.setItem(USER_KEY, JSON.stringify(user));
-        return user;
+      const parsed = await parseApiResponse<WorkerUser>(res);
+      if (parsed.ok && parsed.data) {
+        localStorage.setItem(USER_KEY, JSON.stringify(parsed.data));
+        return parsed.data;
       } else if (res.status === 401) {
         // Token has expired or is invalid
         this.clearSession();

@@ -80,7 +80,13 @@ async def demo_worker_login():
         preferred_language=demo_worker.get("preferred_language", "en") if demo_worker else "en",
         phone=demo_worker.get("phone", "+91 98765 12345") if demo_worker else "+91 98765 12345"
     )
-    return AuthResponse(access_token=token, token_type="bearer", worker=profile)
+    return AuthResponse(
+        success=True,
+        message="Demo session initialized",
+        access_token=token,
+        token_type="bearer",
+        worker=profile
+    )
 
 
 @router.post("/auth/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
@@ -97,7 +103,7 @@ async def worker_signup(req: UserSignupRequest):
     existing = await workers_col.find_one({"email": email_clean})
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email address is already registered."
         )
 
@@ -134,11 +140,12 @@ async def worker_signup(req: UserSignupRequest):
     )
 
     return AuthResponse(
+        success=True,
+        message="Registration successful",
         access_token=token,
         token_type="bearer",
         worker=profile
     )
-
 
 @router.post("/auth/login", response_model=AuthResponse)
 async def worker_login(credentials: Optional[UserLoginRequest] = None):
@@ -188,6 +195,8 @@ async def worker_login(credentials: Optional[UserLoginRequest] = None):
     )
 
     return AuthResponse(
+        success=True,
+        message="Login successful",
         access_token=token,
         token_type="bearer",
         worker=profile

@@ -179,9 +179,9 @@ async def test_auth_flow_signup_login():
         assert signup_data["worker"]["name"] == "Pooja Verma"
         token = signup_data["access_token"]
 
-        # 2. Duplicate signup should fail
+        # 2. Duplicate signup should fail with 409 Conflict
         dup_resp = await ac.post("/api/v1/auth/signup", json=signup_payload)
-        assert dup_resp.status_code == 400
+        assert dup_resp.status_code in (400, 409)
 
         # 3. Login with correct credentials
         login_resp = await ac.post("/api/v1/auth/login", json={

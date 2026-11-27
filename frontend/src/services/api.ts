@@ -8,6 +8,7 @@ import { extractLocally, generateSpokenSummaries } from './fallbackExtractor';
 import { evaluateRiskLocally } from './riskEngine';
 import { db } from '../db/dexie';
 import { API_BASE, authService } from './auth';
+import { parseApiResponse } from './apiUtils';
 
 export function getAuthHeaders(): Record<string, string> {
   const token = authService.getToken();
@@ -32,8 +33,9 @@ export async function extractVisitVoice(
       body: JSON.stringify({ transcript, language }),
     });
 
-    if (res.ok) {
-      const data = await res.json();
+    const parsed = await parseApiResponse<any>(res);
+    if (parsed.ok && parsed.data) {
+      const data = parsed.data;
       return {
         extracted: data.extracted,
         engine: data.engine_used,
@@ -65,8 +67,9 @@ export async function evaluateRisk(data: StructuredVisitData): Promise<RiskEvalu
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
-    if (res.ok) {
-      return await res.json();
+    const parsed = await parseApiResponse<RiskEvaluation>(res);
+    if (parsed.ok && parsed.data) {
+      return parsed.data;
     }
   } catch (err) {
     console.info('Backend risk check unavailable. Performing local risk evaluation.');
@@ -208,14 +211,17 @@ export async function syncPendingVisits(): Promise<{ synced: number; skipped: nu
       }),
     });
 
-    if (res.ok) {
-      const result = await res.json();
-      for (const id of result.synced_ids) {
-        await db.visits.where('visit_id').equals(id).modify({ sync_status: 'synced' });
+    const parsed = await parseApiResponse<any>(res);
+    if (parsed.ok && parsed.data) {
+      const result = parsed.data;
+      if (Array.isArray(result.synced_ids)) {
+        for (const id of result.synced_ids) {
+          await db.visits.where('visit_id').equals(id).modify({ sync_status: 'synced' });
+        }
       }
       return {
-        synced: result.synced_count,
-        skipped: result.duplicates_skipped,
+        synced: result.synced_count || 0,
+        skipped: result.duplicates_skipped || 0,
         total: pending.length,
       };
     }

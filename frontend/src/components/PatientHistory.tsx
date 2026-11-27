@@ -19,6 +19,8 @@ interface PatientHistoryProps {
   workerId?: string;
   onBack: () => void;
   onSelectVisit?: (visit: LocalVisitRecord) => void;
+  initialFilter?: string;
+  initialVisitId?: string;
 }
 
 export const PatientHistory: React.FC<PatientHistoryProps> = ({
@@ -26,10 +28,12 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
   workerId,
   onBack,
   onSelectVisit,
+  initialFilter = 'all',
+  initialVisitId,
 }) => {
   const [visits, setVisits] = useState<LocalVisitRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>(initialFilter);
   const [isVoiceSearching, setIsVoiceSearching] = useState<boolean>(false);
   const [selectedVisit, setSelectedVisit] = useState<LocalVisitRecord | null>(null);
 
@@ -48,6 +52,11 @@ export const PatientHistory: React.FC<PatientHistoryProps> = ({
       .reverse()
       .sortBy('created_at');
     setVisits(list);
+
+    if (initialVisitId) {
+      const match = list.find((v) => v.visit_id === initialVisitId);
+      if (match) setSelectedVisit(match);
+    }
   };
 
   const handleVoiceSearch = () => {
