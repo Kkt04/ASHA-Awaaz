@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Wifi, 
   WifiOff, 
   RefreshCw, 
   HeartPulse, 
   LogOut, 
-  User, 
-  Home, 
-  ArrowLeft,
-  ChevronDown
+  Home
 } from 'lucide-react';
 import { LanguageCode } from '../types';
 import { getTranslation } from '../i18n';
@@ -124,24 +120,16 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Network connectivity status pill */}
-          <div
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
-              isOnline
-                ? 'bg-emerald-900/80 text-emerald-200 border border-emerald-600'
-                : 'bg-amber-900/80 text-amber-200 border border-amber-600'
-            }`}
-            title={isOnline ? t.online : t.offline}
-          >
-            {isOnline ? (
-              <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-            ) : (
+          {/* Offline Warning Pill (Only displayed when network is offline; Online mark removed for clean navigation) */}
+          {!isOnline && (
+            <div
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-900/80 text-amber-200 border border-amber-600 animate-pulse"
+              title="Offline - Records will be saved locally"
+            >
               <WifiOff className="w-3.5 h-3.5 text-amber-400" />
-            )}
-            <span className="hidden sm:inline text-[11px]">
-              {isOnline ? t.online : 'Offline'}
-            </span>
-          </div>
+              <span className="hidden sm:inline text-[11px]">Offline</span>
+            </div>
+          )}
 
           {/* Pending Sync Badge */}
           {pendingCount > 0 && (
@@ -163,6 +151,7 @@ export const Header: React.FC<HeaderProps> = ({
           <LanguageDropdown
             currentLanguage={language}
             onLanguageChange={onLanguageChange}
+            variant="header"
           />
 
           {/* User Sign Out Button */}

@@ -278,7 +278,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-4 px-6 rounded-2xl font-bold text-base text-white bg-health-primary hover:bg-health-dark disabled:opacity-60 shadow-md shadow-health-primary/30 transition-all flex items-center justify-center space-x-2 touch-target"
+                className="w-full py-3.5 px-6 rounded-2xl font-extrabold text-base text-white bg-health-primary hover:bg-health-dark active:bg-emerald-950 focus:outline-none focus:ring-4 focus:ring-health-primary/30 dark:focus:ring-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-health-primary/25 dark:shadow-emerald-950/40 border-0 transition-all duration-150 flex items-center justify-center space-x-2 touch-target"
               >
                 {isLoading ? (
                   <>

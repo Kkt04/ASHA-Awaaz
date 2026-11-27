@@ -126,14 +126,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <button
                     type="button"
                     onClick={onNavigateLogin}
-                    className="py-2.5 px-4 rounded-xl font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-card border border-transparent hover:border-gray-200 dark:hover:border-dark-border transition-all touch-target"
+                    className="py-2.5 px-5 rounded-xl font-bold text-white bg-health-primary hover:bg-health-dark active:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 shadow-md shadow-health-primary/20 transition-all touch-target flex items-center space-x-1"
                   >
-                    {t.navLogin}
+                    <span>{t.navLogin}</span>
                   </button>
                   <button
                     type="button"
                     onClick={onNavigateSignup}
-                    className="py-2.5 px-5 rounded-xl font-bold text-white bg-health-primary hover:bg-health-dark shadow-md shadow-health-primary/25 transition-all touch-target"
+                    className="py-2.5 px-5 rounded-xl font-bold text-health-dark dark:text-emerald-300 bg-health-mint dark:bg-emerald-950/70 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-health-mintborder dark:border-emerald-800 transition-all touch-target"
                   >
                     {t.navGetStarted}
                   </button>
@@ -201,14 +201,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <button
                     type="button"
                     onClick={onNavigateLogin}
-                    className="w-full py-3 rounded-xl font-semibold text-gray-800 dark:text-gray-100 bg-gray-100 dark:bg-dark-card hover:bg-gray-200 border border-gray-200 dark:border-dark-border"
+                    className="w-full py-3 rounded-xl font-bold text-white bg-health-primary hover:bg-health-dark active:bg-emerald-900 shadow-md shadow-health-primary/20 transition-all flex items-center justify-center space-x-2 touch-target"
                   >
-                    {t.navLogin}
+                    <span>{t.navLogin}</span>
                   </button>
                   <button
                     type="button"
                     onClick={onNavigateSignup}
-                    className="w-full py-3 rounded-xl font-bold text-white bg-health-primary hover:bg-health-dark shadow-md"
+                    className="w-full py-3 rounded-xl font-bold text-health-dark dark:text-emerald-300 bg-health-mint dark:bg-emerald-950/70 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-health-mintborder dark:border-emerald-800 transition-all flex items-center justify-center space-x-2 touch-target"
                   >
                     {t.navGetStarted}
                   </button>
