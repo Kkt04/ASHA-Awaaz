@@ -2,9 +2,10 @@ import {
   StructuredVisitData, 
   RiskEvaluation, 
   LocalVisitRecord, 
-  LanguageCode 
+  LanguageCode,
+  CorrectionResult
 } from '../types';
-import { extractLocally, generateSpokenSummaries } from './fallbackExtractor';
+import { extractLocally, correctLocally, generateSpokenSummaries } from './fallbackExtractor';
 import { evaluateRiskLocally } from './riskEngine';
 import { db } from '../db/dexie';
 import { API_BASE, authService } from './auth';
@@ -30,7 +31,11 @@ export async function extractVisitVoice(
     const res = await fetch(`${API_BASE}/extract`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ transcript, language }),
+      body: JSON.stringify({ 
+        transcript, 
+        language,
+        existing_data: existingData 
+      }),
     });
 
     const parsed = await parseApiResponse<any>(res);
@@ -57,6 +62,65 @@ export async function extractVisitVoice(
     summaryHi: hi,
     summaryTa: ta,
     summaryEn: en,
+  };
+}
+
+export async function correctVisitVoice(
+  correctionText: string,
+  language: LanguageCode = 'hi',
+  currentData: StructuredVisitData,
+  caseId?: string
+): Promise<CorrectionResult> {
+  try {
+    const res = await fetch(`${API_BASE}/correct`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        case_id: caseId,
+        current_data: currentData,
+        correction_text: correctionText,
+        language
+      }),
+    });
+
+    const parsed = await parseApiResponse<any>(res);
+    if (parsed.ok && parsed.data) {
+      const data = parsed.data;
+      return {
+        success: true,
+        updated: data.updated_data,
+        fieldsChanged: data.fields_changed || [],
+        fieldsUnchanged: data.fields_unchanged || [],
+        ambiguityNote: data.ambiguity_note,
+        engine: data.engine_used || 'backend_api',
+        summaryHi: data.speech_summary_hi,
+        summaryTa: data.speech_summary_ta,
+        summaryEn: data.speech_summary_en,
+        summaryBho: data.speech_summary_bho,
+      };
+    }
+  } catch (err) {
+    console.info('Backend correction API unavailable. Performing deterministic correction locally:', err);
+  }
+
+  // Local offline deterministic correction
+  const { updated, fieldsChanged, fieldsUnchanged, ambiguityNote } = correctLocally(
+    currentData,
+    correctionText,
+    language
+  );
+  const { hi, ta, en } = generateSpokenSummaries(updated);
+  return {
+    success: true,
+    updated,
+    fieldsChanged,
+    fieldsUnchanged,
+    ambiguityNote,
+    engine: 'local_deterministic',
+    summaryHi: hi,
+    summaryTa: ta,
+    summaryEn: en,
+    summaryBho: hi,
   };
 }
 

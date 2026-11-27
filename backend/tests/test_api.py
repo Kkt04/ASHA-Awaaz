@@ -37,6 +37,38 @@ async def test_extract_endpoint_success():
 
 
 @pytest.mark.asyncio
+async def test_correct_endpoint_success():
+    payload = {
+        "current_data": {
+            "patient_name": "Sunita",
+            "category": "pregnant_woman",
+            "patient_age": 25,
+            "pregnancy_month": 6,
+            "vitals": {
+                "blood_pressure": {"systolic": 140, "diastolic": 90}
+            },
+            "symptoms": ["fever"],
+            "medicines": [],
+            "missing_fields": [],
+            "uncertain_fields": [],
+            "original_transcript": "Sunita, 25 years, 6 months pregnant"
+        },
+        "correction_text": "No, her age is 28, not 25. And she does not have fever.",
+        "language": "en"
+    }
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post("/api/v1/correct", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["updated_data"]["patient_age"] == 28
+        assert data["updated_data"]["patient_name"] == "Sunita"
+        assert "fever" not in data["updated_data"]["symptoms"]
+        assert "patient_age" in data["fields_changed"]
+        assert "symptoms" in data["fields_changed"]
+
+
+@pytest.mark.asyncio
 async def test_extract_endpoint_invalid_short_transcript():
     payload = {
         "transcript": "a",

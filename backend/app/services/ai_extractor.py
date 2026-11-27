@@ -1,9 +1,9 @@
 import json
 import logging
 import httpx
-from typing import Optional
+from typing import Optional, List, Tuple
 from app.config import settings
-from app.schemas.extraction import StructuredVisitData, ExtractionResponse
+from app.schemas.extraction import StructuredVisitData, ExtractionResponse, CorrectionResponse
 from app.services.fallback_extractor import fallback_extractor
 
 logger = logging.getLogger(__name__)
@@ -15,6 +15,7 @@ Output STRICT JSON conforming to this exact schema:
 {
   "patient_name": "string or null",
   "category": "pregnant_woman" | "newborn" | "child" | "lactating_mother" | "general" | "unknown",
+  "patient_age": integer (0-120) or null,
   "pregnancy_month": integer (1-10) or null,
   "newborn_age_days": integer (0-365) or null,
   "child_age_years": float or null,
@@ -45,6 +46,19 @@ CRITICAL RULES:
 2. Standardize symptoms (e.g., 'pairon mein sujan' -> 'swelling_in_feet', 'bukhar' -> 'fever', 'chakkar' -> 'dizziness', 'khoon' -> 'bleeding').
 3. Distinguish between medicine taken and medicine missed.
 4. Output raw valid JSON ONLY without any markdown ticks or commentary.
+"""
+
+CORRECTION_PROMPT = """You are ASHA Awaaz AI. Your task is to apply a spoken or typed correction to an EXISTING structured healthcare record.
+
+RULES:
+1. Update ONLY the fields mentioned in the correction (e.g. if the user says 'Her age is 28, not 25', update only patient_age to 28).
+2. If the user states a negative symptom (e.g. 'She does not have fever', 'No fever', 'bukhar nahi hai'), REMOVE that symptom from the symptoms array.
+3. PRESERVE all existing unaffected fields exactly as they are.
+4. Return a JSON object with:
+   - "updated_data": the updated structured record
+   - "fields_changed": array of field names that were updated
+   - "fields_unchanged": array of field names preserved
+   - "ambiguity_note": string if ambiguous, else null
 """
 
 
@@ -122,6 +136,90 @@ class AIExtractorService:
         return ExtractionResponse(
             success=True,
             extracted=extracted,
+            engine_used="deterministic_fallback",
+            speech_summary_hi=hi_sum,
+            speech_summary_ta=ta_sum,
+            speech_summary_en=en_sum
+        )
+
+    async def correct(
+        self,
+        current_data: StructuredVisitData,
+        correction_text: str,
+        language: str = "hi"
+    ) -> CorrectionResponse:
+        # If no Groq API Key is configured, use deterministic fallback
+        if not self.api_key or self.api_key.strip() == "":
+            updated, changed, unchanged, ambiguity = fallback_extractor.correct(current_data, correction_text, language)
+            hi_sum, ta_sum, en_sum = fallback_extractor.generate_spoken_summaries(updated)
+            return CorrectionResponse(
+                success=True,
+                updated_data=updated,
+                fields_changed=changed,
+                fields_unchanged=unchanged,
+                ambiguity_note=ambiguity,
+                engine_used="deterministic_fallback",
+                speech_summary_hi=hi_sum,
+                speech_summary_ta=ta_sum,
+                speech_summary_en=en_sum
+            )
+
+        # Attempt Groq LLM correction
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                }
+                user_msg = (
+                    f"Language: {language}\n"
+                    f"Existing Record:\n{current_data.model_dump_json()}\n\n"
+                    f"Spoken Correction:\n{correction_text}"
+                )
+
+                payload = {
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": CORRECTION_PROMPT},
+                        {"role": "user", "content": user_msg}
+                    ],
+                    "temperature": 0.1,
+                    "response_format": {"type": "json_object"}
+                }
+
+                resp = await client.post(self.groq_url, headers=headers, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    parsed = json.loads(data["choices"][0]["message"]["content"])
+                    updated_data = StructuredVisitData.model_validate(parsed.get("updated_data", current_data.model_dump()))
+                    changed = parsed.get("fields_changed", [])
+                    unchanged = parsed.get("fields_unchanged", [])
+                    ambiguity = parsed.get("ambiguity_note")
+                    hi_sum, ta_sum, en_sum = fallback_extractor.generate_spoken_summaries(updated_data)
+
+                    return CorrectionResponse(
+                        success=True,
+                        updated_data=updated_data,
+                        fields_changed=changed,
+                        fields_unchanged=unchanged,
+                        ambiguity_note=ambiguity,
+                        engine_used="groq_llm",
+                        speech_summary_hi=hi_sum,
+                        speech_summary_ta=ta_sum,
+                        speech_summary_en=en_sum
+                    )
+        except Exception as e:
+            logger.error(f"Error in Groq correction: {e}. Falling back to deterministic engine.")
+
+        # Fallback deterministic correction
+        updated, changed, unchanged, ambiguity = fallback_extractor.correct(current_data, correction_text, language)
+        hi_sum, ta_sum, en_sum = fallback_extractor.generate_spoken_summaries(updated)
+        return CorrectionResponse(
+            success=True,
+            updated_data=updated,
+            fields_changed=changed,
+            fields_unchanged=unchanged,
+            ambiguity_note=ambiguity,
             engine_used="deterministic_fallback",
             speech_summary_hi=hi_sum,
             speech_summary_ta=ta_sum,

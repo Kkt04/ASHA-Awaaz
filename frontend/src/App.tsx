@@ -57,6 +57,7 @@ export const App: React.FC = () => {
   const [riskEvaluation, setRiskEvaluation] = useState<RiskEvaluation | null>(null);
   const [spokenSummary, setSpokenSummary] = useState<string>('');
   const [engineUsed, setEngineUsed] = useState<string>('groq_llm');
+  const [highlightedFields, setHighlightedFields] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const isSavingRef = React.useRef<boolean>(false);
@@ -230,6 +231,7 @@ export const App: React.FC = () => {
     setStructuredData(null);
     setRiskEvaluation(null);
     setSpokenSummary('');
+    setHighlightedFields([]);
     setIsSaving(false);
     isSavingRef.current = false;
     setCurrentScreen('recording');
@@ -239,6 +241,7 @@ export const App: React.FC = () => {
     const newCaseId = `CASE_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     setCurrentCaseId(newCaseId);
     setCurrentTranscript('');
+    setHighlightedFields([]);
     setStructuredData({
       patient_name: patient.name,
       category: (patient.category as any) || 'pregnant_woman',
@@ -265,6 +268,7 @@ export const App: React.FC = () => {
     }
 
     setCurrentTranscript(clean);
+    setHighlightedFields([]);
     setIsProcessing(true);
 
     try {
@@ -321,10 +325,12 @@ export const App: React.FC = () => {
 
   const handleCorrection = async (
     updatedData: StructuredVisitData,
-    newSummary: string
+    newSummary: string,
+    fieldsChanged?: string[]
   ) => {
     setStructuredData(updatedData);
     setSpokenSummary(newSummary);
+    setHighlightedFields(fieldsChanged || []);
     // Re-evaluate risk for the SAME case
     try {
       const updatedRisk = await evaluateRisk(updatedData);
@@ -525,6 +531,7 @@ export const App: React.FC = () => {
               data={structuredData}
               language={language}
               engineUsed={engineUsed}
+              highlightedFields={highlightedFields}
             />
 
             {/* Voice Confirmation Read-Back & Corrections */}

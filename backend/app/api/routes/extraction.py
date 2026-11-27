@@ -1,12 +1,17 @@
 from fastapi import APIRouter, HTTPException
-from app.schemas.extraction import ExtractionRequest, ExtractionResponse
+from app.schemas.extraction import (
+    ExtractionRequest, 
+    ExtractionResponse, 
+    CorrectionRequest, 
+    CorrectionResponse
+)
 from app.services.ai_extractor import ai_extractor_service
-from app.services.risk_engine import clinical_risk_engine
 
-router = APIRouter(prefix="/extract", tags=["AI Voice Extraction"])
+router = APIRouter(tags=["AI Voice Extraction & Correction"])
 
 
-@router.post("", response_model=ExtractionResponse)
+@router.post("/extract", response_model=ExtractionResponse)
+@router.post("/extract/", response_model=ExtractionResponse)
 async def extract_health_information(req: ExtractionRequest):
     """
     Extract structured clinical health record from spoken transcript.
@@ -18,6 +23,25 @@ async def extract_health_information(req: ExtractionRequest):
     response = await ai_extractor_service.extract(
         transcript=req.transcript,
         language=req.language,
-        existing_data=None
+        existing_data=req.existing_data
+    )
+    return response
+
+
+@router.post("/correct", response_model=CorrectionResponse)
+@router.post("/correct/", response_model=CorrectionResponse)
+@router.post("/extract/correct", response_model=CorrectionResponse)
+async def correct_health_information(req: CorrectionRequest):
+    """
+    Apply a spoken or typed correction to an existing visit's structured data.
+    Updates only the corrected fields, preserves untouched data, and handles negative statements.
+    """
+    if not req.correction_text or len(req.correction_text.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Correction text is too short to process.")
+
+    response = await ai_extractor_service.correct(
+        current_data=req.current_data,
+        correction_text=req.correction_text,
+        language=req.language
     )
     return response

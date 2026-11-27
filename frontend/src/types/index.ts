@@ -21,6 +21,7 @@ export interface MedicineItem {
 export interface StructuredVisitData {
   patient_name?: string | null;
   category: 'pregnant_woman' | 'newborn' | 'child' | 'lactating_mother' | 'general' | 'unknown';
+  patient_age?: number | null;
   pregnancy_month?: number | null;
   newborn_age_days?: number | null;
   child_age_years?: number | null;
@@ -33,6 +34,19 @@ export interface StructuredVisitData {
   uncertain_fields: string[];
   original_transcript: string;
   confidence?: number;
+}
+
+export interface CorrectionResult {
+  success: boolean;
+  updated: StructuredVisitData;
+  fieldsChanged: string[];
+  fieldsUnchanged: string[];
+  ambiguityNote?: string | null;
+  engine: string;
+  summaryHi: string;
+  summaryTa: string;
+  summaryEn: string;
+  summaryBho?: string;
 }
 
 export interface RiskFlag {

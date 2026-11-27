@@ -76,6 +76,105 @@ def test_voice_correction_single_field():
     assert "swelling_in_feet" in updated_data.symptoms
 
 
+def test_age_correction_example_1():
+    # Example 1 from spec: Sunita, age 25, pregnancy month 6
+    # Correction: "No, her age is 28, not 25." -> Age becomes 28, pregnancy month 6 preserved
+    initial = StructuredVisitData(
+        patient_name="Sunita",
+        category="pregnant_woman",
+        patient_age=25,
+        pregnancy_month=6,
+        original_transcript="Sunita, age 25, 6 mahine pregnant"
+    )
+    
+    updated, changed, unchanged, ambiguity = fallback_extractor.correct(
+        initial,
+        "No, her age is 28, not 25.",
+        language="en"
+    )
+    
+    assert updated.patient_name == "Sunita"
+    assert updated.patient_age == 28
+    assert updated.pregnancy_month == 6
+    assert "patient_age" in changed
+    assert "pregnancy_month" in unchanged
+
+
+def test_bp_correction_example_2():
+    # Example 2: BP 140/90 -> "Her blood pressure is 120 over 80."
+    initial = StructuredVisitData(
+        patient_name="Sunita",
+        category="pregnant_woman",
+        patient_age=28,
+        pregnancy_month=6,
+        vitals=Vitals(blood_pressure=BloodPressure(systolic=140, diastolic=90)),
+        original_transcript="Sunita, BP 140/90"
+    )
+    
+    updated, changed, unchanged, _ = fallback_extractor.correct(
+        initial,
+        "Her blood pressure is 120 over 80.",
+        language="en"
+    )
+    
+    assert updated.vitals.blood_pressure.systolic == 120
+    assert updated.vitals.blood_pressure.diastolic == 80
+    assert updated.patient_name == "Sunita"
+    assert updated.patient_age == 28
+    assert "blood_pressure" in changed
+
+
+def test_symptom_removal_negation_example_3():
+    # Example 3: Symptoms: fever and headache -> "She does not have fever. She only has a headache."
+    initial = StructuredVisitData(
+        patient_name="Meena",
+        category="general",
+        symptoms=["fever", "severe_headache"],
+        original_transcript="Meena, fever and headache"
+    )
+    
+    updated, changed, unchanged, _ = fallback_extractor.correct(
+        initial,
+        "She does not have fever. She only has a headache.",
+        language="en"
+    )
+    
+    assert "fever" not in updated.symptoms
+    assert "severe_headache" in updated.symptoms
+    assert "symptoms" in changed
+    assert updated.patient_name == "Meena"
+
+
+def test_multiple_rounds_of_correction():
+    # Start with initial visit
+    data = fallback_extractor.extract("Sunita, 25 saal, 6 mahine pregnant, BP 140 by 90, bukhar hai", language="hi")
+    assert data.patient_age == 25
+    assert data.vitals.blood_pressure.systolic == 140
+    assert "fever" in data.symptoms
+
+    # Round 1: Fix age
+    round1, ch1, _, _ = fallback_extractor.correct(data, "No, her age is 28, not 25", language="en")
+    assert round1.patient_age == 28
+    assert round1.vitals.blood_pressure.systolic == 140
+    assert "fever" in round1.symptoms
+
+    # Round 2: Fix BP
+    round2, ch2, _, _ = fallback_extractor.correct(round1, "Her blood pressure is 120 over 80", language="en")
+    assert round2.patient_age == 28
+    assert round2.vitals.blood_pressure.systolic == 120
+    assert round2.vitals.blood_pressure.diastolic == 80
+    assert "fever" in round2.symptoms
+
+    # Round 3: Remove fever
+    round3, ch3, _, _ = fallback_extractor.correct(round2, "She does not have fever. She only has a headache.", language="en")
+    assert round3.patient_age == 28
+    assert round3.vitals.blood_pressure.systolic == 120
+    assert "fever" not in round3.symptoms
+    assert "severe_headache" in round3.symptoms
+    assert round3.patient_name == "Sunita"
+    assert round3.pregnancy_month == 6
+
+
 def test_missing_fields_detection():
     # Only mentions name and pregnancy, vitals missing
     transcript = "Sunita 6 mahine ki pregnant hai."

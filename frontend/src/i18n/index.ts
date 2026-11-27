@@ -86,6 +86,7 @@ export function generateSpokenSummaryForLang(
   data: {
     patient_name?: string | null;
     category?: string;
+    patient_age?: number | null;
     pregnancy_month?: number | null;
     newborn_age_days?: number | null;
     child_age_years?: number | null;
@@ -102,6 +103,13 @@ export function generateSpokenSummaryForLang(
   const t = getTranslation(langCode);
   const name = data.patient_name || (langCode === 'en' ? 'Patient' : 'मरीज़');
   const parts: string[] = [name];
+
+  if (data.patient_age) {
+    if (langCode === 'en') parts.push(`Age ${data.patient_age} years`);
+    else if (langCode === 'ta') parts.push(`வயது ${data.patient_age}`);
+    else if (langCode === 'bho') parts.push(`उमिर ${data.patient_age} साल`);
+    else parts.push(`उम्र ${data.patient_age} साल`);
+  }
 
   if (data.category === 'pregnant_woman' && data.pregnancy_month) {
     if (langCode === 'en') parts.push(`${data.pregnancy_month} months pregnant`);
