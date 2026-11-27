@@ -25,8 +25,9 @@ export class SpeechRecognitionManager {
   private isExplicitlyStopped = true;
   private currentLanguage: LanguageCode = 'hi';
   private currentCallbacks: RecognitionCallbacks | null = null;
-  private accumulatedFinalText = '';
-  private currentInterimText = '';
+  private baseAccumulatedText = '';
+  private currentSessionFinal = '';
+  private currentSessionInterim = '';
   private restartTimeout: any = null;
   private silenceTimer: any = null;
 
@@ -41,70 +42,11 @@ export class SpeechRecognitionManager {
   }
 
   /**
-   * Query current microphone permission state if Permission API is supported
+   * Check if running on Safari / WebKit engine
    */
-  public async checkMicrophonePermission(): Promise<'granted' | 'denied' | 'prompt' | 'unsupported'> {
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      return 'unsupported';
-    }
-    try {
-      if (navigator.permissions && navigator.permissions.query) {
-        const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-        return result.state as 'granted' | 'denied' | 'prompt';
-      }
-    } catch {
-      // Permission query not available for mic on this browser
-    }
-    return 'prompt';
-  }
-
-  /**
-   * Explicitly request microphone access through getUserMedia
-   * This triggers the browser prompt and surfaces permission state cleanly
-   */
-  public async requestMicrophoneAccess(): Promise<{ ok: boolean; error?: SpeechRecognitionErrorType; message?: string }> {
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      return {
-        ok: false,
-        error: 'not-supported',
-        message: 'Microphone device access is not supported by this browser.'
-      };
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-      // Release tracks right away so SpeechRecognition / AudioMeter can bind cleanly
-      stream.getTracks().forEach((track) => track.stop());
-      return { ok: true };
-    } catch (err: any) {
-      const errorName = err?.name || '';
-      console.warn('Microphone permission/access error:', errorName, err?.message);
-      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
-        return {
-          ok: false,
-          error: 'not-allowed',
-          message: 'Microphone permission was denied. Please allow microphone access in your browser settings.'
-        };
-      }
-      if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
-        return {
-          ok: false,
-          error: 'audio-capture',
-          message: 'No microphone was found on this device. Please connect a microphone and try again.'
-        };
-      }
-      return {
-        ok: false,
-        error: 'unknown',
-        message: err?.message || 'Could not access microphone.'
-      };
-    }
+  private isSafari(): boolean {
+    if (typeof navigator === 'undefined') return false;
+    return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
   }
 
   /**
@@ -116,26 +58,49 @@ export class SpeechRecognitionManager {
   ) {
     if (!this.isSupported()) {
       callbacks.onError?.(
-        'Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.',
+        'Speech recognition is not supported in this browser. Please open in Google Chrome, Microsoft Edge, or Safari.',
         'not-supported'
       );
       return;
     }
 
-    // Stop and cleanly tear down any previous recognition session
+    // Stop previous instance cleanly
     this.stop(false);
 
     this.isExplicitlyStopped = false;
     this.currentLanguage = language;
     this.currentCallbacks = callbacks;
-    this.accumulatedFinalText = '';
-    this.currentInterimText = '';
+    this.baseAccumulatedText = '';
+    this.currentSessionFinal = '';
+    this.currentSessionInterim = '';
 
     this.spawnSession();
   }
 
   /**
-   * Spawns a fresh SpeechRecognition instance and hooks events
+   * Switch recognition language on the fly without losing captured text
+   */
+  public setLanguage(language: LanguageCode) {
+    if (this.currentLanguage === language) return;
+    this.currentLanguage = language;
+
+    if (this.isListening && !this.isExplicitlyStopped) {
+      // Absorb current text into base before restarting with new language
+      this.baseAccumulatedText = this.getFullTranscript();
+      this.currentSessionFinal = '';
+      this.currentSessionInterim = '';
+      
+      if (this.recognition) {
+        try {
+          this.recognition.abort();
+        } catch {}
+      }
+      this.spawnSession();
+    }
+  }
+
+  /**
+   * Spawns a fresh SpeechRecognition instance
    */
   private spawnSession() {
     if (this.isExplicitlyStopped || !this.currentCallbacks) {
@@ -151,13 +116,14 @@ export class SpeechRecognitionManager {
       const recognition = new SpeechRecognition();
       this.recognition = recognition;
 
-      recognition.continuous = true;
+      const safari = this.isSafari();
+      // Safari WebKit has known issues with continuous=true; Chrome/Edge excel at continuous
+      recognition.continuous = !safari;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
 
-      // Locale mapping:
-      // Bhojpuri (bho) uses Hindi acoustic model (hi-IN)
-      // Tamil -> ta-IN, English -> en-IN (Indian English), Hindi -> hi-IN
+      // Map language codes to BCP-47 speech tags
+      // Bhojpuri (bho) maps to Indian Hindi acoustic model (hi-IN)
       const langTag =
         this.currentLanguage === 'ta'
           ? 'ta-IN'
@@ -171,18 +137,25 @@ export class SpeechRecognitionManager {
 
       const resetSilenceTimer = () => {
         if (this.silenceTimer) clearTimeout(this.silenceTimer);
-        // 12-second gentle silence alert (gives ASHA workers adequate time to articulate)
         this.silenceTimer = setTimeout(() => {
           if (this.isListening && !this.isExplicitlyStopped) {
             callbacks?.onSilenceTimeout?.();
           }
-        }, 12000);
+        }, 10000);
       };
 
       recognition.onstart = () => {
         this.isListening = true;
         callbacks?.onStart?.();
         resetSilenceTimer();
+      };
+
+      recognition.onaudiostart = () => {
+        callbacks?.onSpeechDetected?.(true);
+      };
+
+      recognition.onsoundstart = () => {
+        callbacks?.onSpeechDetected?.(true);
       };
 
       recognition.onspeechstart = () => {
@@ -194,31 +167,34 @@ export class SpeechRecognitionManager {
         callbacks?.onSpeechDetected?.(false);
       };
 
+      recognition.onsoundend = () => {
+        callbacks?.onSpeechDetected?.(false);
+      };
+
       recognition.onresult = (event: any) => {
         resetSilenceTimer();
-        let sessionInterim = '';
-        let sessionFinal = '';
+        callbacks?.onSpeechDetected?.(true);
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        let sessionFinal = '';
+        let sessionInterim = '';
+
+        // Iterate through all results in the current session
+        for (let i = 0; i < event.results.length; ++i) {
           const res = event.results[i];
           if (res.isFinal) {
-            const finalPiece = res[0].transcript.trim();
-            if (finalPiece) {
-              sessionFinal += finalPiece + ' ';
+            const piece = res[0].transcript.trim();
+            if (piece) {
+              sessionFinal += piece + ' ';
             }
           } else {
             sessionInterim += res[0].transcript;
           }
         }
 
-        if (sessionFinal) {
-          // Append final chunk cleanly without duplicate spaces
-          this.accumulatedFinalText = (this.accumulatedFinalText + ' ' + sessionFinal).trim();
-        }
+        this.currentSessionFinal = sessionFinal.trim();
+        this.currentSessionInterim = sessionInterim.trim();
 
-        this.currentInterimText = sessionInterim;
-        const combined = (this.accumulatedFinalText + (this.currentInterimText ? ' ' + this.currentInterimText : '')).trim();
-
+        const combined = this.getFullTranscript();
         callbacks?.onTranscriptChange(combined, false);
       };
 
@@ -227,21 +203,19 @@ export class SpeechRecognitionManager {
         console.warn('Speech recognition error event:', error, event.message);
 
         if (error === 'no-speech') {
-          // Normal pause in speech; do not abort continuous session
           callbacks?.onSpeechDetected?.(false);
           callbacks?.onSilenceTimeout?.();
           return;
         }
 
         if (error === 'aborted') {
-          // Expected when stopping or re-initializing
           return;
         }
 
         if (error === 'not-allowed') {
           this.isExplicitlyStopped = true;
           callbacks?.onError?.(
-            'Microphone access denied. Please click the lock or camera icon in your address bar to allow microphone permissions.',
+            'Microphone access is blocked. Please tap the lock or camera icon in your address bar and set Microphone to "Allow".',
             'not-allowed'
           );
           return;
@@ -257,8 +231,7 @@ export class SpeechRecognitionManager {
         }
 
         if (error === 'language-not-supported') {
-          // Fall back to en-IN or hi-IN if dialect code was refused
-          console.warn(`Language ${langTag} refused, falling back to en-US / hi-IN`);
+          console.warn(`Language ${langTag} not supported, falling back to hi-IN / en-IN`);
           try {
             recognition.lang = 'hi-IN';
             return;
@@ -267,7 +240,7 @@ export class SpeechRecognitionManager {
 
         if (error === 'network') {
           callbacks?.onError?.(
-            'Speech recognition network timeout. Words captured so far are saved.',
+            'Speech recognition network timeout. Spoken words captured so far are preserved.',
             'network'
           );
           return;
@@ -280,17 +253,23 @@ export class SpeechRecognitionManager {
         this.isListening = false;
         if (this.silenceTimer) clearTimeout(this.silenceTimer);
 
-        // If the session was NOT explicitly stopped by user, auto-reconnect
-        // (Browser Web Speech API automatically terminates after ~10-15s idle connection)
+        // Absorb final results of this session into baseAccumulatedText
+        if (this.currentSessionFinal) {
+          this.baseAccumulatedText = (this.baseAccumulatedText + ' ' + this.currentSessionFinal).trim();
+          this.currentSessionFinal = '';
+        }
+
+        // If not explicitly stopped by the user, automatically reconnect
+        // (Chrome terminates continuous speech after ~10-15s idle, Safari terminates after each utterance)
         if (!this.isExplicitlyStopped && this.currentCallbacks) {
           if (this.restartTimeout) clearTimeout(this.restartTimeout);
           this.restartTimeout = setTimeout(() => {
             if (!this.isExplicitlyStopped) {
               this.spawnSession();
             }
-          }, 150);
+          }, 120);
         } else {
-          const finalClean = (this.accumulatedFinalText + ' ' + this.currentInterimText).trim();
+          const finalClean = this.getFullTranscript();
           callbacks?.onTranscriptChange(finalClean, true);
           callbacks?.onEnd?.();
         }
@@ -300,9 +279,8 @@ export class SpeechRecognitionManager {
     } catch (err: any) {
       console.warn('Recognition start exception:', err);
       if (err?.name === 'InvalidStateError') {
-        // Recognition was already starting; schedule a brief retry
         if (!this.isExplicitlyStopped) {
-          setTimeout(() => this.spawnSession(), 200);
+          setTimeout(() => this.spawnSession(), 150);
         }
       } else {
         this.currentCallbacks?.onError?.(err?.message || 'Could not start microphone', 'unknown');
@@ -336,9 +314,10 @@ export class SpeechRecognitionManager {
     }
 
     this.isListening = false;
-    const finalResult = (this.accumulatedFinalText + (this.currentInterimText ? ' ' + this.currentInterimText : '')).trim();
-    this.accumulatedFinalText = finalResult;
-    this.currentInterimText = '';
+    const finalResult = this.getFullTranscript();
+    this.baseAccumulatedText = finalResult;
+    this.currentSessionFinal = '';
+    this.currentSessionInterim = '';
 
     if (triggerEndCallback && this.currentCallbacks) {
       this.currentCallbacks.onTranscriptChange(finalResult, true);
@@ -368,16 +347,22 @@ export class SpeechRecognitionManager {
       this.recognition = null;
     }
     this.isListening = false;
-    this.accumulatedFinalText = '';
-    this.currentInterimText = '';
+    this.baseAccumulatedText = '';
+    this.currentSessionFinal = '';
+    this.currentSessionInterim = '';
     this.currentCallbacks = null;
   }
 
   /**
-   * Get current transcript accumulated so far
+   * Assembles full transcript combining base, final, and interim pieces
    */
-  public getTranscript(): string {
-    return (this.accumulatedFinalText + (this.currentInterimText ? ' ' + this.currentInterimText : '')).trim();
+  public getFullTranscript(): string {
+    const parts = [
+      this.baseAccumulatedText,
+      this.currentSessionFinal,
+      this.currentSessionInterim,
+    ].filter(Boolean);
+    return parts.join(' ').replace(/\s+/g, ' ').trim();
   }
 
   public getIsListening(): boolean {
