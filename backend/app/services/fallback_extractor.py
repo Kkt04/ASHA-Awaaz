@@ -1,7 +1,7 @@
 import re
 from typing import Optional, List, Tuple
 from app.schemas.extraction import StructuredVisitData, Vitals, BloodPressure, MedicineItem
-from app.utils.medical_dictionary import HINDI_SYMPTOM_MAP, TAMIL_SYMPTOM_MAP, MEDICINE_MAP, CATEGORY_MAP
+from app.utils.medical_dictionary import HINDI_SYMPTOM_MAP, TAMIL_SYMPTOM_MAP, ENGLISH_SYMPTOM_MAP, MEDICINE_MAP, CATEGORY_MAP
 
 
 class DeterministicFallbackExtractor:
@@ -379,6 +379,9 @@ class DeterministicFallbackExtractor:
             if kw in text:
                 symptoms.add(sym)
         for kw, sym in TAMIL_SYMPTOM_MAP.items():
+            if kw in text:
+                symptoms.add(sym)
+        for kw, sym in ENGLISH_SYMPTOM_MAP.items():
             if kw in text:
                 symptoms.add(sym)
         return list(symptoms)

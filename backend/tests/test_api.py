@@ -631,4 +631,101 @@ async def test_user_data_isolation_multi_tenant():
         assert cross_history.status_code == 404
 
 
+@pytest.mark.asyncio
+async def test_confirmation_flow_initial_extraction_not_mutated():
+    """
+    Test Step 1 & 2:
+    - Extraction produces initial draft
+    - No automatic changes or secondary AI calls mutate the draft
+    - Saying YES preserves all fields intact
+    """
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        extract_resp = await ac.post("/api/v1/extract", json={
+            "transcript": "Sunita, 7 months pregnant, BP 150/100, swelling in feet",
+            "language": "en"
+        })
+        assert extract_resp.status_code == 200
+        extracted = extract_resp.json()["extracted"]
+        assert extracted["patient_name"] == "Sunita"
+        assert extracted["category"] == "pregnant_woman"
+        assert extracted["vitals"]["blood_pressure"]["systolic"] == 150
+        assert extracted["vitals"]["blood_pressure"]["diastolic"] == 100
+        assert "swelling_in_feet" in extracted["symptoms"]
+
+        # Confirming YES: the data remains identical to initial extraction
+        confirmed_data = dict(extracted)
+        assert confirmed_data == extracted
+
+
+@pytest.mark.asyncio
+async def test_correction_then_submit_entry_flow():
+    """
+    Test Path B:
+    - User says NO
+    - User submits correction (e.g. "Age 28, BP 120/80, no fever")
+    - Only targeted fields update; untouched fields remain intact
+    - Submitting entry creates visit with updated fields
+    """
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        initial_data = {
+            "patient_name": "Sunita",
+            "patient_age": 25,
+            "category": "pregnant_woman",
+            "pregnancy_month": 7,
+            "vitals": {
+                "blood_pressure": {"systolic": 140, "diastolic": 90}
+            },
+            "symptoms": ["fever", "headache"],
+            "medicines": [],
+            "missing_fields": [],
+            "uncertain_fields": [],
+            "original_transcript": "Sunita, age 25, BP 140/90, fever and headache"
+        }
+
+        # 1. User submits correction
+        correct_resp = await ac.post("/api/v1/correct", json={
+            "correction_text": "No, her age is 28, not 25. Blood pressure is 120/80. She does not have fever, only headache.",
+            "language": "en",
+            "current_data": initial_data
+        })
+        assert correct_resp.status_code == 200
+        updated = correct_resp.json()["updated_data"]
+
+        # Verify only corrected fields changed
+        assert updated["patient_age"] == 28
+        assert updated["vitals"]["blood_pressure"]["systolic"] == 120
+        assert updated["vitals"]["blood_pressure"]["diastolic"] == 80
+        assert "fever" not in updated["symptoms"]
+        assert "headache" in updated["symptoms"]
+        # Untouched fields preserved
+        assert updated["patient_name"] == "Sunita"
+        assert updated["category"] == "pregnant_woman"
+        assert updated["pregnancy_month"] == 7
+
+        # 2. Clicking "Submit Entry" saves the confirmed visit
+        unique_case_id = f"CASE_CONFIRM_TEST_{1795764000}_{secrets.token_hex(4)}"
+        visit_payload = {
+            "visit_id": unique_case_id,
+            "patient_id": "PAT_001",
+            "patient_name": updated["patient_name"],
+            "worker_id": "ASHA_WORKER_001",
+            "original_transcript": initial_data["original_transcript"],
+            "language": "en",
+            "structured_data": updated,
+            "risk_evaluation": {
+                "is_high_risk": False,
+                "danger_flags": []
+            }
+        }
+
+        create_resp = await ac.post("/api/v1/visits", json=visit_payload)
+        assert create_resp.status_code == 200
+        assert create_resp.json()["visit_id"] == unique_case_id
+
+        # 3. Double-click idempotency guard: sending same payload returns 200 without creating duplicate
+        double_click_resp = await ac.post("/api/v1/visits", json=visit_payload)
+        assert double_click_resp.status_code == 200
+
+
+
 

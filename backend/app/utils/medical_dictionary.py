@@ -90,6 +90,21 @@ TAMIL_SYMPTOM_MAP = {
     "இழுப்பு": "convulsions",
 }
 
+ENGLISH_SYMPTOM_MAP = {
+    "swelling in feet": "swelling_in_feet",
+    "swelling in legs": "swelling_in_feet",
+    "swelling": "swelling_in_feet",
+    "feet swelling": "swelling_in_feet",
+    "headache": "headache",
+    "fever": "fever",
+    "high fever": "high_fever",
+    "dizziness": "dizziness",
+    "bleeding": "bleeding",
+    "vomiting": "vomiting",
+    "blurred vision": "blurred_vision",
+    "difficulty breathing": "difficulty_breathing",
+}
+
 # Medicine names
 MEDICINE_MAP = {
     "iron": "iron_tablet",
