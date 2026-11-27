@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Mic,
   Users,
@@ -30,6 +30,7 @@ import {
 import { LocalVisitRecord, LanguageCode } from '../types';
 import { WorkerUser } from '../services/auth';
 import { getTranslation } from '../i18n';
+import { db } from '../db/dexie';
 
 interface AuthenticatedDashboardProps {
   language: LanguageCode;
@@ -37,7 +38,8 @@ interface AuthenticatedDashboardProps {
   visits: LocalVisitRecord[];
   pendingSyncCount: number;
   onStartRecording: () => void;
-  onViewPatients: (filter?: string, contextTitle?: string) => void;
+  onViewPatients: () => void;
+  onViewVisits: (filter?: string) => void;
   onSelectVisit: (visitId: string) => void;
   onOpenDemoModal: () => void;
   onSyncNow?: () => Promise<void> | void;
@@ -50,6 +52,7 @@ export const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
   pendingSyncCount,
   onStartRecording,
   onViewPatients,
+  onViewVisits,
   onSelectVisit,
   onOpenDemoModal,
   onSyncNow
@@ -59,13 +62,27 @@ export const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
   const [showFollowUpsModal, setShowFollowUpsModal] = useState<boolean>(false);
   const [followUpTab, setFollowUpTab] = useState<'all' | 'overdue' | 'upcoming'>('all');
   const [isSyncingLocal, setIsSyncingLocal] = useState<boolean>(false);
+  const [actualPatientsCount, setActualPatientsCount] = useState<number>(0);
 
   const t = getTranslation(language);
+  const activeWorkerId = currentUser?.worker_id || 'ASHA_WORKER_001';
+
+  // Load actual unique patients count from local IndexedDB
+  useEffect(() => {
+    db.patients
+      .where('worker_id')
+      .equals(activeWorkerId)
+      .count()
+      .then((cnt) => {
+        setActualPatientsCount(cnt);
+      })
+      .catch((err) => console.warn('Could not query patients count:', err));
+  }, [activeWorkerId, visits]);
 
   // 1. Total Visits Count
   const totalVisitsCount = visits.length;
 
-  // 2. Distinct Patients Count
+  // 2. Distinct Patients Count (fallback if DB query hasn't finished)
   const distinctPatientsMap = new Map<string, LocalVisitRecord>();
   visits.forEach((v) => {
     const key = (v.patient_name || '').trim().toLowerCase();
@@ -73,7 +90,7 @@ export const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
       distinctPatientsMap.set(key, v);
     }
   });
-  const totalPatientsCount = distinctPatientsMap.size;
+  const totalPatientsCount = actualPatientsCount > 0 ? actualPatientsCount : distinctPatientsMap.size;
 
   // 3. High-Risk Visits
   const highRiskVisits = visits.filter((v) => v.risk_evaluation?.is_high_risk);
@@ -158,39 +175,58 @@ export const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
 
   return (
     <div className="space-y-6 text-left">
-      {/* ================= 1. WELCOME SECTION ================= */}
-      <section className="bg-gradient-to-br from-emerald-50/80 via-white to-emerald-50/30 dark:from-dark-card dark:via-dark-card dark:to-emerald-950/20 rounded-3xl p-5 sm:p-6 border border-emerald-100 dark:border-dark-border shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center space-x-2 text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider mb-1">
+      {/* ================= 1. WELCOME SECTION WITH HEALTHCARE ARTWORK ================= */}
+      <section className="bg-gradient-to-br from-emerald-50/90 via-white to-emerald-50/40 dark:from-dark-card dark:via-dark-card dark:to-emerald-950/20 rounded-3xl p-5 sm:p-6 border border-emerald-100 dark:border-dark-border shadow-sm overflow-hidden relative">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+          <div className="md:col-span-8 space-y-3">
+            <div className="flex items-center space-x-2 text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">
               <Calendar className="w-3.5 h-3.5" />
               <span>{todayFormatted}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
               Namaste, {workerDisplayName} 👋
             </h1>
-            <p className="text-xs sm:text-sm font-semibold text-gray-600 dark:text-dark-muted mt-1">
-              Your community health workspace is ready. Let's keep your community's health records up to date.
+            <p className="text-xs sm:text-sm font-semibold text-gray-600 dark:text-dark-muted max-w-xl leading-relaxed">
+              Welcome to your community healthcare workstation. Voice-first clinical records for pregnant mothers, newborns, and village families.
             </p>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <div className="py-1.5 px-3 rounded-xl bg-white dark:bg-dark-surface border border-emerald-200 dark:border-emerald-800/60 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center space-x-1.5 shadow-sm">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>{currentUser?.village || 'Rampur Sub-Centre (Kalyanpur)'}</span>
+              </div>
+
+              {isDemoAccount ? (
+                <button
+                  type="button"
+                  onClick={onOpenDemoModal}
+                  className="py-1.5 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs shadow-sm flex items-center space-x-1.5 transition-all touch-target"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>{t.demoModeBtn || 'Evaluation Demo'}</span>
+                </button>
+              ) : null}
+            </div>
           </div>
 
-          {/* Quick Demo Trigger or Village Badge */}
-          <div className="flex items-center space-x-2 shrink-0">
-            {isDemoAccount ? (
-              <button
-                type="button"
-                onClick={onOpenDemoModal}
-                className="py-2.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-emerald-700/20 flex items-center space-x-2 transition-all touch-target"
-              >
-                <Sparkles className="w-4 h-4 animate-spin text-emerald-200" />
-                <span>{t.demoModeBtn || 'Evaluation Demo'}</span>
-              </button>
-            ) : (
-              <div className="py-2 px-3.5 rounded-2xl bg-white dark:bg-dark-surface border border-emerald-200 dark:border-emerald-800/60 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center space-x-1.5 shadow-sm">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>{currentUser?.village || 'Sub-Centre Kalyanpur'}</span>
-              </div>
-            )}
+          {/* Right Column: Healthcare Artwork Card */}
+          <div className="md:col-span-4 flex justify-center md:justify-end">
+            <div className="relative rounded-2xl bg-white/70 dark:bg-dark-surface/60 border border-emerald-100 dark:border-dark-border p-2 shadow-sm max-w-[220px] w-full flex flex-col items-center">
+              <picture className="w-full flex items-center justify-center">
+                <source media="(prefers-reduced-motion: reduce)" srcSet="/assets/asha-healthcare-worker.png" type="image/png" />
+                <img
+                  src="/assets/asha-healthcare-worker.gif"
+                  alt="ASHA worker interacting with expectant mother"
+                  className="w-full h-auto max-h-[140px] object-contain drop-shadow-sm"
+                  loading="lazy"
+                  width={512}
+                  height={348}
+                />
+              </picture>
+              <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 mt-1">
+                ASHA Maternal Care
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -207,7 +243,7 @@ export const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
           {/* Card 1: Total Patients */}
           <button
             type="button"
-            onClick={() => onViewPatients('all', 'Total Registered Patients')}
+            onClick={onViewPatients}
             className="group relative bg-white dark:bg-dark-card rounded-2xl p-4 sm:p-5 border border-emerald-100 dark:border-dark-border shadow-sm hover:border-emerald-400 dark:hover:border-emerald-600 hover:-translate-y-1 hover:shadow-md active:scale-[0.98] transition-all text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 overflow-hidden"
           >
             {/* Background Accent Ring */}
@@ -228,13 +264,13 @@ export const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
                   {totalPatientsCount}
                 </span>
                 <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                  {totalPatientsCount > 0 ? 'active' : ''}
+                  {totalPatientsCount > 0 ? 'unique' : ''}
                 </span>
               </div>
               <div className="flex items-center justify-between mt-1 text-[11px] font-semibold text-gray-500 dark:text-dark-muted">
-                <span>{totalPatientsCount === 0 ? 'Ready for first patient' : 'Unique registered'}</span>
+                <span>{totalPatientsCount === 0 ? 'Ready for first patient' : 'Registered people'}</span>
                 <span className="text-health-primary dark:text-emerald-400 group-hover:translate-x-1 transition-transform flex items-center">
-                  View <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                  Directory <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                 </span>
               </div>
             </div>
@@ -243,7 +279,7 @@ export const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
           {/* Card 2: Visits Recorded */}
           <button
             type="button"
-            onClick={() => onViewPatients('all', 'Field Visit Records')}
+            onClick={() => onViewVisits('all')}
             className="group relative bg-white dark:bg-dark-card rounded-2xl p-4 sm:p-5 border border-teal-100 dark:border-dark-border shadow-sm hover:border-teal-400 dark:hover:border-teal-600 hover:-translate-y-1 hover:shadow-md active:scale-[0.98] transition-all text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 overflow-hidden"
           >
             <div className="absolute -right-3 -bottom-3 w-16 h-16 rounded-full bg-teal-50 dark:bg-teal-950/30 pointer-events-none group-hover:scale-125 transition-transform" />
@@ -259,17 +295,17 @@ export const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
 
             <div className="mt-3 relative z-10">
               <div className="flex items-baseline space-x-1">
-                <span className="text-2xl sm:text-3xl font-black text-teal-900 dark:text-teal-300">
+                <span className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">
                   {totalVisitsCount}
                 </span>
                 <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">
-                  {totalVisitsCount > 0 ? 'cases' : ''}
+                  {totalVisitsCount > 0 ? 'encounters' : ''}
                 </span>
               </div>
               <div className="flex items-center justify-between mt-1 text-[11px] font-semibold text-gray-500 dark:text-dark-muted">
-                <span>{totalVisitsCount === 0 ? '0 visits recorded' : 'Home visits logged'}</span>
+                <span>{totalVisitsCount === 0 ? 'No visits yet' : 'Documented encounters'}</span>
                 <span className="text-teal-700 dark:text-teal-400 group-hover:translate-x-1 transition-transform flex items-center">
-                  History <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                  Records <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                 </span>
               </div>
             </div>
@@ -450,7 +486,7 @@ export const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
 
           <button
             type="button"
-            onClick={() => onViewPatients('all', 'Community Patient Directory')}
+            onClick={onViewPatients}
             className="p-3.5 rounded-2xl bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border hover:border-health-primary dark:hover:border-emerald-500 shadow-sm flex items-center space-x-2.5 text-left transition-all touch-target active:scale-95"
           >
             <div className="w-8 h-8 rounded-xl bg-teal-100 dark:bg-teal-950/70 text-teal-700 dark:text-teal-400 flex items-center justify-center shrink-0">
@@ -593,7 +629,7 @@ export const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
             </h3>
             <button
               type="button"
-              onClick={() => onViewPatients('all', 'All Field Visit Records')}
+              onClick={() => onViewVisits('all')}
               className="text-xs font-bold text-health-primary dark:text-emerald-400 hover:underline flex items-center"
             >
               <span>View All ({totalVisitsCount})</span>

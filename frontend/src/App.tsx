@@ -24,6 +24,8 @@ import { VisitCard } from './components/VisitCard';
 import { RiskBanner } from './components/RiskBanner';
 import { VoiceConfirmation } from './components/VoiceConfirmation';
 import { PatientHistory } from './components/PatientHistory';
+import { TotalRegisteredPatients } from './components/TotalRegisteredPatients';
+import { FieldVisitRecords } from './components/FieldVisitRecords';
 import { AuthenticatedDashboard } from './components/AuthenticatedDashboard';
 import { DemoModeModal } from './components/DemoModeModal';
 import { SignOutConfirmModal } from './components/SignOutConfirmModal';
@@ -68,6 +70,7 @@ export const App: React.FC = () => {
   const [historyFilter, setHistoryFilter] = useState<string>('all');
   const [historyContextTitle, setHistoryContextTitle] = useState<string | undefined>(undefined);
   const [selectedHistoryVisitId, setSelectedHistoryVisitId] = useState<string | undefined>(undefined);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(undefined);
   const [isDemoModalOpen, setIsDemoModalOpen] = useState<boolean>(false);
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -232,6 +235,28 @@ export const App: React.FC = () => {
     setCurrentScreen('recording');
   };
 
+  const handleStartRecordingForPatient = (patient: { name: string; patient_id: string; category?: string }) => {
+    const newCaseId = `CASE_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    setCurrentCaseId(newCaseId);
+    setCurrentTranscript('');
+    setStructuredData({
+      patient_name: patient.name,
+      category: (patient.category as any) || 'pregnant_woman',
+      vitals: {},
+      symptoms: [],
+      medicines: [],
+      missing_fields: [],
+      uncertain_fields: [],
+      original_transcript: ''
+    });
+    setRiskEvaluation(null);
+    setSpokenSummary('');
+    setIsSaving(false);
+    isSavingRef.current = false;
+    setCurrentScreen('recording');
+    showToast(`Recording new visit for ${patient.name}`);
+  };
+
   const handleFinishRecording = async (transcript: string) => {
     setCurrentTranscript(transcript);
     setIsProcessing(true);
@@ -394,7 +419,7 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className={`flex-1 w-full mx-auto pb-12 transition-all ${
-        currentScreen === 'home' ? 'max-w-5xl px-4 sm:px-6 pt-2' : 'max-w-2xl px-4 pt-2'
+        currentScreen === 'home' || currentScreen === 'patients' || currentScreen === 'visits' ? 'max-w-5xl px-4 sm:px-6 pt-2' : 'max-w-2xl px-4 pt-2'
       }`}>
         
         {/* ================= Screen: HOME DASHBOARD ================= */}
@@ -405,15 +430,18 @@ export const App: React.FC = () => {
             visits={allVisits}
             pendingSyncCount={pendingSyncCount}
             onStartRecording={handleStartRecording}
-            onViewPatients={(filter, contextTitle) => {
+            onViewPatients={() => {
+              setSelectedPatientId(undefined);
+              setCurrentScreen('patients');
+            }}
+            onViewVisits={(filter) => {
               setHistoryFilter(filter || 'all');
-              setHistoryContextTitle(contextTitle);
               setSelectedHistoryVisitId(undefined);
-              setCurrentScreen('history');
+              setCurrentScreen('visits');
             }}
             onSelectVisit={(visitId) => {
               setSelectedHistoryVisitId(visitId);
-              setCurrentScreen('history');
+              setCurrentScreen('visits');
             }}
             onOpenDemoModal={() => setIsDemoModalOpen(true)}
             onSyncNow={async () => {
@@ -424,6 +452,43 @@ export const App: React.FC = () => {
                 showToast('Records are up to date.');
               }
               await loadMetrics(currentUser?.worker_id);
+            }}
+          />
+        )}
+
+        {/* ================= Screen: TOTAL REGISTERED PATIENTS ================= */}
+        {currentScreen === 'patients' && (
+          <TotalRegisteredPatients
+            language={language}
+            workerId={currentUser?.worker_id}
+            initialPatientId={selectedPatientId}
+            onBackToHome={() => {
+              setSelectedPatientId(undefined);
+              setCurrentScreen('home');
+            }}
+            onRecordVisitForPatient={handleStartRecordingForPatient}
+            onSelectVisitDetail={(visitId) => {
+              setSelectedHistoryVisitId(visitId);
+              setCurrentScreen('visits');
+            }}
+          />
+        )}
+
+        {/* ================= Screen: FIELD VISIT RECORDS ================= */}
+        {(currentScreen === 'visits' || currentScreen === 'history') && (
+          <FieldVisitRecords
+            language={language}
+            workerId={currentUser?.worker_id}
+            initialFilter={historyFilter}
+            initialVisitId={selectedHistoryVisitId}
+            onBackToHome={() => {
+              setSelectedHistoryVisitId(undefined);
+              setHistoryFilter('all');
+              setCurrentScreen('home');
+            }}
+            onSelectPatient={(patientId) => {
+              setSelectedPatientId(patientId);
+              setCurrentScreen('patients');
             }}
           />
         )}
@@ -494,30 +559,13 @@ export const App: React.FC = () => {
               </button>
 
               <button
-                onClick={() => setCurrentScreen('history')}
+                onClick={() => setCurrentScreen('visits')}
                 className="w-full touch-target min-h-[50px] bg-white dark:bg-dark-card border-2 border-gray-300 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-surface text-gray-800 dark:text-gray-200 font-bold rounded-2xl flex items-center justify-center space-x-2 text-sm transition-all"
               >
-                <span>{t.viewHistoryBtn}</span>
+                <span>View Field Visit Records</span>
               </button>
             </div>
           </div>
-        )}
-
-        {/* ================= Screen: HISTORY ================= */}
-        {currentScreen === 'history' && (
-          <PatientHistory
-            language={language}
-            workerId={currentUser?.worker_id}
-            initialFilter={historyFilter}
-            initialVisitId={selectedHistoryVisitId}
-            contextTitle={historyContextTitle}
-            onBack={() => {
-              setSelectedHistoryVisitId(undefined);
-              setHistoryFilter('all');
-              setHistoryContextTitle(undefined);
-              setCurrentScreen('home');
-            }}
-          />
         )}
       </main>
 
@@ -528,7 +576,7 @@ export const App: React.FC = () => {
         onClose={() => setIsDemoModalOpen(false)}
         onDemoCompleted={async () => {
           await loadMetrics(currentUser?.worker_id);
-          setCurrentScreen('history');
+          setCurrentScreen('visits');
         }}
       />
 

@@ -93,4 +93,6 @@ export type AppScreen =
   | 'visit_card'
   | 'confirmation'
   | 'saved'
-  | 'history';
+  | 'history'
+  | 'patients'
+  | 'visits';

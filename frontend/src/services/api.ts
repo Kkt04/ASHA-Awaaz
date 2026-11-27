@@ -94,7 +94,33 @@ export async function saveVisitRecord(
   const currentUser = authService.getUser();
   const workerId = overrideWorkerId || currentUser?.worker_id || 'ASHA_WORKER_001';
 
-  // 1. Check if record with this visit_id already exists in IndexedDB (IDEMPOTENCY)
+  // 1. Resolve or create unique patient in IndexedDB scoped to this worker
+  let patientId = '';
+  const existingPatient = await db.patients
+    .where('worker_id')
+    .equals(workerId)
+    .filter((p) => p.name.trim().toLowerCase() === patientName.trim().toLowerCase())
+    .first();
+
+  if (existingPatient && existingPatient.id) {
+    patientId = existingPatient.patient_id;
+    // We will update total_visits after checking if this is a new visit or an update
+  } else {
+    patientId = `PAT_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`.toUpperCase();
+    await db.patients.add({
+      patient_id: patientId,
+      worker_id: workerId,
+      name: patientName,
+      category: structuredData.category || 'pregnant_woman',
+      village: currentUser?.village || 'Rampur',
+      total_visits: 1,
+      latest_risk_status: riskEval.is_high_risk ? 'danger' : 'normal',
+      created_at: now,
+      updated_at: now,
+    });
+  }
+
+  // 2. Check if record with this visit_id already exists in IndexedDB (IDEMPOTENCY)
   const existingLocal = await db.visits.where('visit_id').equals(visitId).first();
 
   let localId: number;
@@ -102,6 +128,7 @@ export async function saveVisitRecord(
 
   const record: LocalVisitRecord = {
     visit_id: visitId,
+    patient_id: patientId,
     patient_name: patientName,
     worker_id: workerId,
     original_transcript: transcript,
@@ -119,6 +146,7 @@ export async function saveVisitRecord(
     localId = existingLocal.id;
     record.id = localId;
     await db.visits.update(localId, {
+      patient_id: patientId,
       patient_name: patientName,
       worker_id: workerId,
       original_transcript: transcript,
@@ -133,30 +161,12 @@ export async function saveVisitRecord(
     record.id = localId;
   }
 
-  // 2. Also update or create isolated patient record in Dexie scoped to this worker
-  const existingPatient = await db.patients
-    .where('worker_id')
-    .equals(workerId)
-    .filter((p) => p.name.trim().toLowerCase() === patientName.trim().toLowerCase())
-    .first();
-
+  // 3. Update existing patient's total visits and latest risk status
   if (existingPatient && existingPatient.id) {
     const newTotal = isUpdate ? existingPatient.total_visits : (existingPatient.total_visits || 0) + 1;
     await db.patients.update(existingPatient.id, {
       total_visits: newTotal,
       latest_risk_status: riskEval.is_high_risk ? 'danger' : existingPatient.latest_risk_status,
-      updated_at: now,
-    });
-  } else {
-    await db.patients.add({
-      patient_id: `PAT_${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-      worker_id: workerId,
-      name: patientName,
-      category: structuredData.category || 'pregnant_woman',
-      village: currentUser?.village || 'Rampur',
-      total_visits: 1,
-      latest_risk_status: riskEval.is_high_risk ? 'danger' : 'normal',
-      created_at: now,
       updated_at: now,
     });
   }
