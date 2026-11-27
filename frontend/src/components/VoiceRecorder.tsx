@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { LanguageCode } from '../types';
 import { getTranslation } from '../i18n';
-import { speechRecognitionManager } from '../services/speechRecognition';
+import { speechRecognitionManager, SpeechRecognitionManager } from '../services/speechRecognition';
 import { audioMeter } from '../services/audioMeter';
 import { voiceSynthesizer } from '../services/speechSynthesis';
 
@@ -34,8 +34,11 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const [transcript, setTranscript] = useState<string>('');
   const [duration, setDuration] = useState<number>(0);
   const [audioLevel, setAudioLevel] = useState<number>(10);
+  const [isSpeakingNow, setIsSpeakingNow] = useState<boolean>(false);
   const [isLoudNoise, setIsLoudNoise] = useState<boolean>(false);
   const [isRecognitionSupported, setIsRecognitionSupported] = useState<boolean>(true);
+  const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'no-device'>('prompt');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const [showManualFallback, setShowManualFallback] = useState<boolean>(false);
   const [isEditingTranscript, setIsEditingTranscript] = useState<boolean>(false);
   const [emptyWarning, setEmptyWarning] = useState<boolean>(false);
@@ -45,22 +48,10 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const t = getTranslation(language);
 
   useEffect(() => {
-    // 1. Spoken Audio Greeting (non-blocking, plays in parallel)
-    const promptText =
-      language === 'ta'
-        ? 'வணக்கம், வருகை விவரங்களைப் பேசுங்கள்.'
-        : language === 'en'
-        ? 'Welcome, please speak about the visit.'
-        : language === 'bho'
-        ? 'प्रणाम, दौरा के बारे में बोलीं।'
-        : 'नमस्ते, विज़िट के बारे में बोलिए।';
-
-    voiceSynthesizer.speak(promptText, language);
-
-    // 2. Start recording session immediately
+    // Start recording session with proper permission flow
     startRecordingSession();
 
-    // 3. Duration Clock
+    // Duration Clock
     timerRef.current = setInterval(() => {
       setDuration((prev) => prev + 1);
     }, 1000);
@@ -73,22 +64,44 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     };
   }, [language]);
 
-  const startRecordingSession = () => {
+  const startRecordingSession = async () => {
+    setErrorMessage('');
     const supported = speechRecognitionManager.isSupported();
     setIsRecognitionSupported(supported);
 
     if (!supported) {
+      setErrorMessage('Voice recognition is not supported in this browser. Please use Chrome, Edge, or Safari.');
       setShowManualFallback(true);
       return;
     }
 
-    // Start Audio Level meter (reacts dynamically to user voice volume)
-    audioMeter.start((level, isLoud) => {
+    // Step 1: Check and request microphone permission before starting recognition
+    const permResult = await SpeechRecognitionManager.requestMicrophonePermission();
+    if (!permResult.granted) {
+      if (permResult.error === 'not-allowed') {
+        setPermissionState('denied');
+        setErrorMessage('Microphone access is blocked. Please allow microphone permission in your browser address bar.');
+      } else if (permResult.error === 'no-device') {
+        setPermissionState('no-device');
+        setErrorMessage('No microphone found on this device. You can type or use quick sample presets below.');
+      } else {
+        setPermissionState('denied');
+        setErrorMessage(`Microphone error: ${permResult.error || 'Permission error'}.`);
+      }
+      setShowManualFallback(true);
+      return;
+    }
+
+    setPermissionState('granted');
+
+    // Step 2: Start Audio Level meter (reacts dynamically to user voice volume)
+    audioMeter.start((level, isLoud, isSpeaking) => {
       setAudioLevel(level);
       setIsLoudNoise(isLoud);
+      setIsSpeakingNow(isSpeaking);
     });
 
-    // Start Web Speech Recognition
+    // Step 3: Start Web Speech Recognition
     speechRecognitionManager.start(language, {
       onTranscriptChange: (text) => {
         setTranscript(text);
@@ -96,15 +109,29 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         setEmptyWarning(false);
       },
       onSilenceTimeout: () => {
-        // Gentle silence notice
+        // Gentle notice
       },
       onError: (err) => {
         console.warn('Speech recognition error event:', err);
         if (err === 'not-allowed') {
+          setPermissionState('denied');
+          setErrorMessage('Microphone access was blocked.');
           setShowManualFallback(true);
+        } else if (err === 'audio-capture') {
+          setPermissionState('no-device');
+          setErrorMessage('Microphone hardware is busy or unavailable.');
+          setShowManualFallback(true);
+        } else if (err === 'network') {
+          setErrorMessage('Speech recognition network error. You can continue speaking or edit the text manually.');
         }
       },
     });
+  };
+
+  const handleRetryPermission = () => {
+    setPermissionState('prompt');
+    setErrorMessage('');
+    startRecordingSession();
   };
 
   const handleRestart = () => {
@@ -215,11 +242,46 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     <div className="max-w-md mx-auto p-4 flex flex-col items-center justify-between min-h-[82vh]">
       {/* Top Status & Noise Alert */}
       <div className="w-full text-center pt-2">
-        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-health-mint text-health-dark text-sm font-semibold mb-2 shadow-sm">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />
-          <span>{t.listening}</span>
-          <span className="text-gray-500 font-mono font-bold">({formatTime(duration)})</span>
+        <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-health-mint dark:bg-emerald-950/70 text-health-dark dark:text-emerald-300 text-sm font-semibold mb-2 shadow-sm border border-emerald-200 dark:border-emerald-800">
+          {permissionState === 'denied' ? (
+            <>
+              <AlertTriangle className="w-4 h-4 text-red-500" />
+              <span className="text-red-700 dark:text-red-300 font-bold">Microphone Blocked</span>
+            </>
+          ) : permissionState === 'no-device' ? (
+            <>
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              <span className="text-amber-700 dark:text-amber-300 font-bold">No Microphone Detected</span>
+            </>
+          ) : isSpeakingNow ? (
+            <>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+              <span className="text-emerald-800 dark:text-emerald-300 font-bold">Speech Detected</span>
+              <span className="text-emerald-700 dark:text-emerald-400 font-mono font-bold">({formatTime(duration)})</span>
+            </>
+          ) : (
+            <>
+              <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />
+              <span>{t.listening}</span>
+              <span className="text-gray-500 dark:text-dark-muted font-mono font-bold">({formatTime(duration)})</span>
+            </>
+          )}
         </div>
+
+        {errorMessage && (
+          <div className="mt-2 p-2.5 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-xs text-red-800 dark:text-red-300 flex items-center justify-between space-x-2 text-left">
+            <span>{errorMessage}</span>
+            {permissionState === 'denied' && (
+              <button
+                type="button"
+                onClick={handleRetryPermission}
+                className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] shrink-0"
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
 
         {isLoudNoise && (
           <div className="mt-2 flex items-center justify-center space-x-1.5 text-xs font-semibold text-amber-800 bg-amber-100 px-3 py-1.5 rounded-lg border border-amber-300">
@@ -236,20 +298,49 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         )}
       </div>
 
-      {/* Central Pulsing Microphone Visual (Scales dynamically with ambient voice volume) */}
+      {/* Central Interactive Microphone Button (Scales dynamically with ambient voice volume) */}
       <div className="my-6 flex flex-col items-center justify-center relative">
         <div
-          className="absolute rounded-full bg-health-primary/25 dark:bg-emerald-500/20 pointer-events-none transition-all duration-150"
+          className={`absolute rounded-full pointer-events-none transition-all duration-150 ${
+            permissionState === 'denied'
+              ? 'bg-red-200 dark:bg-red-900/30'
+              : isSpeakingNow
+              ? 'bg-emerald-400/40 dark:bg-emerald-500/30 animate-pulse'
+              : 'bg-health-primary/25 dark:bg-emerald-500/20'
+          }`}
           style={{
             width: `${140 + Math.min(90, audioLevel * 1.4)}px`,
             height: `${140 + Math.min(90, audioLevel * 1.4)}px`,
           }}
         />
-        <div className="w-32 h-32 rounded-full bg-health-primary text-white flex items-center justify-center shadow-elevated mic-pulse touch-target">
-          <Mic className="w-14 h-14" />
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (permissionState === 'denied') {
+              handleRetryPermission();
+            } else if (transcript.trim()) {
+              handleStop();
+            }
+          }}
+          title={permissionState === 'denied' ? 'Click to retry microphone' : 'Microphone active - speak naturally'}
+          className={`w-32 h-32 rounded-full text-white flex items-center justify-center shadow-elevated mic-pulse touch-target focus:outline-none focus:ring-4 focus:ring-emerald-300 cursor-pointer ${
+            permissionState === 'denied'
+              ? 'bg-red-600 hover:bg-red-700'
+              : isSpeakingNow
+              ? 'bg-emerald-600 scale-105'
+              : 'bg-health-primary hover:bg-health-dark'
+          }`}
+        >
+          {permissionState === 'denied' ? (
+            <MicOff className="w-14 h-14" />
+          ) : (
+            <Mic className="w-14 h-14" />
+          )}
+        </button>
         <p className="mt-5 text-sm font-semibold text-gray-700 dark:text-dark-muted max-w-xs text-center">
-          "Sunita, 7 mahine ki pregnant hai, BP 150 by 100 hai, pairon mein sujan hai..."
+          {permissionState === 'denied'
+            ? 'Allow microphone access to record voice, or choose a scenario below'
+            : '"Sunita, 7 mahine ki pregnant hai, BP 150 by 100 hai, pairon mein sujan hai..."'}
         </p>
       </div>
 

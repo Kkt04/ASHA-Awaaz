@@ -46,6 +46,29 @@ export class SpeechRecognitionManager {
     );
   }
 
+  public static async requestMicrophonePermission(): Promise<{ granted: boolean; error?: string }> {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      return { granted: false, error: 'mediaDevices_unavailable' };
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Release test stream tracks immediately
+      stream.getTracks().forEach((track) => {
+        try { track.stop(); } catch {}
+      });
+      return { granted: true };
+    } catch (err: any) {
+      const name = err?.name || '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        return { granted: false, error: 'not-allowed' };
+      }
+      if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        return { granted: false, error: 'no-device' };
+      }
+      return { granted: false, error: name || 'permission_error' };
+    }
+  }
+
   public start(
     language: LanguageCode,
     callbacks: RecognitionCallbacks
@@ -113,15 +136,31 @@ export class SpeechRecognitionManager {
       console.warn('Speech recognition error event:', event.error);
       if (event.error === 'no-speech') {
         callbacks.onSilenceTimeout?.();
-      } else if (event.error === 'aborted') {
-        // Normal when stopped programmatically
-      } else {
-        callbacks.onError?.(event.error);
+        return;
       }
+      if (event.error === 'aborted') {
+        // Normal when stopped programmatically
+        return;
+      }
+
+      // Fatal errors: stop listening so onend does not loop endlessly
+      if (
+        event.error === 'not-allowed' ||
+        event.error === 'service-not-allowed' ||
+        event.error === 'audio-capture'
+      ) {
+        this.isListening = false;
+        if (this.restartTimeout) {
+          clearTimeout(this.restartTimeout);
+          this.restartTimeout = null;
+        }
+      }
+
+      callbacks.onError?.(event.error);
     };
 
     this.recognition.onend = () => {
-      // If recognition stopped unexpectedly while we were listening, auto-restart
+      // If recognition stopped unexpectedly while we were intentionally listening, auto-restart with a safety throttle
       if (this.isListening && this.currentCallbacks) {
         if (this.restartTimeout) clearTimeout(this.restartTimeout);
         this.restartTimeout = setTimeout(() => {
@@ -129,10 +168,10 @@ export class SpeechRecognitionManager {
             try {
               this.recognition.start();
             } catch (err) {
-              console.warn('Auto-restart recognition exception:', err);
+              console.warn('Auto-restart recognition notice:', err);
             }
           }
-        }, 150);
+        }, 200);
       } else {
         this.isListening = false;
         if (this.silenceTimer) clearTimeout(this.silenceTimer);

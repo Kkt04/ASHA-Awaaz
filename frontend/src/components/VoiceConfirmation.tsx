@@ -36,7 +36,11 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
   onCorrectionMade,
   isSaving = false,
 }) => {
-  const [mode, setMode] = useState<'confirming' | 'correcting'>('confirming');
+  // Modes:
+  // 1. 'confirming': asks "Is this information correct?" (YES confirms to final review; NO opens correction)
+  // 2. 'correcting': captures user voice/text correction and provides "Submit Correction" button
+  // 3. 'confirmed': information confirmed, displays primary "Submit Entry" button to save
+  const [mode, setMode] = useState<'confirming' | 'correcting' | 'confirmed'>('confirming');
   const [isSpeaking, setIsSpeaking] = useState<boolean>(true);
   const [isListening, setIsListening] = useState<boolean>(false);
   const [correctionInput, setCorrectionInput] = useState<string>('');
@@ -44,101 +48,124 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
   const [successNotice, setSuccessNotice] = useState<string>('');
   const [errorNotice, setErrorNotice] = useState<string>('');
 
-  const hasTriggeredConfirmRef = useRef<boolean>(false);
   const isSubmittingCorrectionRef = useRef<boolean>(false);
+  const isSubmittingEntryRef = useRef<boolean>(false);
   const t = getTranslation(language);
 
   // Localized conversation strings
   const strings = {
     en: {
       confirmQuestion: 'Is this information correct?',
-      askCorrection: 'Which information should I correct? Speak or type below.',
-      whichInfoPrompt: 'Which information should I correct?',
-      submitCorrection: 'Submit Correction',
-      submitting: 'Updating Details...',
-      correctionPlaceholder: 'e.g. "Her age is 28, not 25" or "She does not have fever, only headache"',
-      correctionSavedNotice: 'Information updated successfully! Is everything correct now?',
+      confirmedNotice: 'Information confirmed! You can now submit the entry.',
+      submitEntryBtn: 'Submit Entry',
+      savingEntryBtn: 'Saving Case...',
       yesCorrectBtn: 'Yes, Information is Correct',
       noCorrectBtn: 'No, Correct Information',
-      listeningPrompt: 'Listening for your answer ("Yes" or "No")...',
+      whichInfoPrompt: 'Which information should I correct?',
+      askCorrection: 'Which information should I correct? Speak or type below.',
+      submitCorrection: 'Submit Correction',
+      submittingCorrection: 'Updating Details...',
+      correctionPlaceholder: 'e.g. "Her age is 28, not 25" or "She does not have fever, only headache"',
+      correctionSavedNotice: "I've updated the information. Is everything correct now?",
+      listeningPrompt: 'Listening for answer ("Yes" or "No")...',
       listeningCorrectionPrompt: 'Listening to your correction... Speak now',
       tapToSpeak: 'Tap to speak correction',
       reRecord: 'Re-speak',
       cancelCorrection: 'Back to Confirmation',
-      quickBpTip: 'Quick correction: Say "BP 120/80" or "Age 28"'
+      editConfirmed: 'Need to make changes? Edit details',
+      confirmedBadge: 'Confirmed & Ready to Submit'
     },
     hi: {
       confirmQuestion: 'क्या यह जानकारी सही है?',
-      askCorrection: 'कौन सी जानकारी सुधारनी है? बोलिए या नीचे लिखिए।',
-      whichInfoPrompt: 'कौन सी जानकारी सुधारनी है?',
-      submitCorrection: 'सुधार लागू करें',
-      submitting: 'सुधार दर्ज हो रहा है...',
-      correctionPlaceholder: 'जैसे: "उम्र 25 नहीं 28 है" या "बुखार नहीं है, सिर्फ सिर दर्द है"',
-      correctionSavedNotice: 'जानकारी सफलतापूर्वक अपडेट हो गई! क्या अब सब सही है?',
+      confirmedNotice: 'जानकारी की पुष्टि हो गई है। अब आप विज़िट दर्ज कर सकते हैं।',
+      submitEntryBtn: 'विज़िट दर्ज करें (Submit Entry)',
+      savingEntryBtn: 'केस दर्ज हो रहा है...',
       yesCorrectBtn: 'हाँ, जानकारी सही है',
       noCorrectBtn: 'नहीं, जानकारी सुधारें',
+      whichInfoPrompt: 'कौन सी जानकारी सुधारनी है?',
+      askCorrection: 'कौन सी जानकारी सुधारनी है? बोलिए या नीचे लिखिए।',
+      submitCorrection: 'सुधार लागू करें',
+      submittingCorrection: 'सुधार दर्ज हो रहा है...',
+      correctionPlaceholder: 'जैसे: "उम्र 25 नहीं 28 है" या "बुखार नहीं है, सिर्फ सिर दर्द है"',
+      correctionSavedNotice: 'जानकारी अपडेट हो गई है। क्या अब सब सही है?',
       listeningPrompt: 'जवाब सुन रहे हैं ("हाँ" या "नहीं")...',
       listeningCorrectionPrompt: 'सुधार सुन रहे हैं... अब बोलिए',
       tapToSpeak: 'सुधार बोलने के लिए टैप करें',
       reRecord: 'दोबारा बोलें',
       cancelCorrection: 'वापस जाएं',
-      quickBpTip: 'सुझाव: "बीपी 120 बाई 80" या "उम्र 28 साल" बोलें'
+      editConfirmed: 'कुछ बदलना है? सुधार करें',
+      confirmedBadge: 'पुष्ट किया गया • दर्ज करने के लिए तैयार'
     },
     ta: {
       confirmQuestion: 'இந்த தகவல் சரியா?',
-      askCorrection: 'எந்த தகவலை திருத்த வேண்டும்? பேசுங்கள் அல்லது எழுதுங்கள்.',
-      whichInfoPrompt: 'எந்த தகவலை திருத்த வேண்டும்?',
-      submitCorrection: 'திருத்தத்தை சமர்ப்பிக்கவும்',
-      submitting: 'புதுப்பிக்கப்படுகிறது...',
-      correctionPlaceholder: 'எ.கா: "வயது 28, 25 அல்ல" அல்லது "காய்ச்சல் இல்லை, தலைவலி மட்டுமே"',
-      correctionSavedNotice: 'தகவல் வெற்றிகரமாக புதுப்பிக்கப்பட்டது! இப்போது எல்லாம் சரியா?',
+      confirmedNotice: 'தகவல் உறுதிப்படுத்தப்பட்டது. இப்போது பதிவைச் சமர்ப்பிக்கலாம்.',
+      submitEntryBtn: 'பதிவைச் சமர்ப்பிக்கவும் (Submit Entry)',
+      savingEntryBtn: 'சேமிக்கப்படுகிறது...',
       yesCorrectBtn: 'ஆம், தகவல் சரி',
       noCorrectBtn: 'இல்லை, தகவலைத் திருத்து',
+      whichInfoPrompt: 'எந்த தகவலை திருத்த வேண்டும்?',
+      askCorrection: 'எந்த தகவலை திருத்த வேண்டும்? பேசுங்கள் அல்லது எழுதுங்கள்.',
+      submitCorrection: 'திருத்தத்தை சமர்ப்பிக்கவும்',
+      submittingCorrection: 'புதுப்பிக்கப்படுகிறது...',
+      correctionPlaceholder: 'எ.கா: "வயது 28, 25 அல்ல" அல்லது "காய்ச்சல் இல்லை, தலைவலி மட்டுமே"',
+      correctionSavedNotice: 'தகவல் புதுப்பிக்கப்பட்டது. இப்போது எல்லாம் சரியா?',
       listeningPrompt: 'பதிலை கேட்கிறது ("ஆம்" அல்லது "இல்லை")...',
       listeningCorrectionPrompt: 'திருத்தத்தைக் கேட்கிறது... பேசுங்கள்',
       tapToSpeak: 'திருத்தத்தை பேச தொடவும்',
       reRecord: 'மீண்டும் பேசு',
       cancelCorrection: 'ரத்து செய்',
-      quickBpTip: 'குறிப்பு: "பிபி 120/80" அல்லது "வயது 28" என்று கூறவும்'
+      editConfirmed: 'மாற்ற வேண்டுமா? திருத்து',
+      confirmedBadge: 'உறுதிப்படுத்தப்பட்டது • சமர்ப்பிக்கத் தயார்'
     },
     bho: {
       confirmQuestion: 'का ई जानकारी ठीक बा?',
-      askCorrection: 'कवन जानकारी सुधारे के बा? बोलीं भा नीचे लिखीं।',
-      whichInfoPrompt: 'कवन जानकारी सुधारे के बा?',
-      submitCorrection: 'सुधार दर्ज करीं',
-      submitting: 'सुधारल जा रहल बा...',
-      correctionPlaceholder: 'जैसे: "उमिर 25 ना 28 ह" भा "बुखार नइखे, खाली माथा बथा बा"',
-      correctionSavedNotice: 'जानकारी सुधर गइल! का अब सब ठीक बा?',
+      confirmedNotice: 'जानकारी पुष्ट हो गइल। अब रउआ विज़िट दर्ज कर सकत बानी।',
+      submitEntryBtn: 'विज़िट दर्ज करीं (Submit Entry)',
+      savingEntryBtn: 'दर्ज हो रहल बा...',
       yesCorrectBtn: 'हाँ, जानकारी सही बा',
       noCorrectBtn: 'ना, जानकारी सुधारीं',
+      whichInfoPrompt: 'कवन जानकारी सुधारे के बा?',
+      askCorrection: 'कवन जानकारी सुधारे के बा? बोलीं भा नीचे लिखीं।',
+      submitCorrection: 'सुधार दर्ज करीं',
+      submittingCorrection: 'सुधारल जा रहल बा...',
+      correctionPlaceholder: 'जैसे: "उमिर 25 ना 28 ह" भा "बुखार नइखे, खाली माथा बथा बा"',
+      correctionSavedNotice: 'जानकारी सुधर गइल। का अब सब ठीक बा?',
       listeningPrompt: 'जवाब सुनत बानी ("हाँ" भा "ना")...',
       listeningCorrectionPrompt: 'सुधार सुनत बानी... अब बोलीं',
       tapToSpeak: 'सुधार बोले खातिर टैप करीं',
       reRecord: 'फेर बोलीं',
       cancelCorrection: 'पाछे जाईं',
-      quickBpTip: 'सुझाव: "बीपी 120 बाई 80" भा "उमिर 28 साल" बोलीं'
+      editConfirmed: 'बदले के बा? सुधार करीं',
+      confirmedBadge: 'पुष्ट भइल • दर्ज करे खातिर तइयार'
     }
   }[language] || {
     confirmQuestion: 'Is this information correct?',
-    askCorrection: 'Which information should I correct? Speak or type below.',
-    whichInfoPrompt: 'Which information should I correct?',
-    submitCorrection: 'Submit Correction',
-    submitting: 'Updating Details...',
-    correctionPlaceholder: 'e.g. "Her age is 28, not 25" or "She does not have fever, only headache"',
-    correctionSavedNotice: 'Information updated successfully! Is everything correct now?',
+    confirmedNotice: 'Information confirmed! You can now submit the entry.',
+    submitEntryBtn: 'Submit Entry',
+    savingEntryBtn: 'Saving Case...',
     yesCorrectBtn: 'Yes, Information is Correct',
     noCorrectBtn: 'No, Correct Information',
-    listeningPrompt: 'Listening for your answer ("Yes" or "No")...',
+    whichInfoPrompt: 'Which information should I correct?',
+    askCorrection: 'Which information should I correct? Speak or type below.',
+    submitCorrection: 'Submit Correction',
+    submittingCorrection: 'Updating Details...',
+    correctionPlaceholder: 'e.g. "Her age is 28, not 25" or "She does not have fever, only headache"',
+    correctionSavedNotice: "I've updated the information. Is everything correct now?",
+    listeningPrompt: 'Listening for answer ("Yes" or "No")...',
     listeningCorrectionPrompt: 'Listening to your correction... Speak now',
     tapToSpeak: 'Tap to speak correction',
     reRecord: 'Re-speak',
     cancelCorrection: 'Back to Confirmation',
-    quickBpTip: 'Quick correction: Say "BP 120/80" or "Age 28"'
+    editConfirmed: 'Need to make changes? Edit details',
+    confirmedBadge: 'Confirmed & Ready to Submit'
   };
 
   useEffect(() => {
-    hasTriggeredConfirmRef.current = false;
-    readSummaryAloud();
+    // When summaryText or patient details change initially or after correction,
+    // read the summary aloud and ask for confirmation
+    if (mode === 'confirming') {
+      readSummaryAloud();
+    }
 
     return () => {
       voiceSynthesizer.stop();
@@ -160,14 +187,15 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
   };
 
   /**
-   * Listen for user saying YES (confirm) or NO (enter correction mode)
+   * Listen strictly for YES (confirm) or NO (enter correction mode).
+   * Does NOT treat ambient noise or random phrases as corrections!
    */
   const startListeningForYesNo = () => {
-    if (!speechRecognitionManager.isSupported() || hasTriggeredConfirmRef.current || isSaving) return;
+    if (!speechRecognitionManager.isSupported() || mode !== 'confirming' || isSaving) return;
     setIsListening(true);
 
     speechRecognitionManager.start(language, {
-      onTranscriptChange: (text, isFinal) => {
+      onTranscriptChange: (text) => {
         const lower = text.toLowerCase().trim();
 
         // 1. Check for Affirmation (YES)
@@ -186,10 +214,12 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
           lower === 'ok' ||
           lower === 'ஆம்' ||
           lower === 'சரி' ||
-          lower === 'ठीक बा';
+          lower === 'हाँ' ||
+          lower === 'ठीक बा' ||
+          lower.includes('sahi');
 
         if (isYes) {
-          handleConfirmAction();
+          handleSayYes();
           return;
         }
 
@@ -204,19 +234,18 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
           lower === 'illai' ||
           lower.startsWith('illai') ||
           lower === 'na' ||
+          lower.startsWith('na ') ||
+          lower === 'नहीं' ||
+          lower === 'ना' ||
+          lower === 'नाहीं' ||
           lower.includes('sudhar') ||
           lower.includes('change') ||
           lower.includes('correct');
 
         if (isNo) {
           speechRecognitionManager.stop();
-          enterCorrectionMode();
+          handleSayNo();
           return;
-        }
-
-        // 3. If user directly speaks a correction phrase (e.g. "Age 28 hai" or "No fever")
-        if (isFinal && lower.length > 3) {
-          enterCorrectionMode(text);
         }
       },
       onSilenceTimeout: () => {
@@ -232,17 +261,43 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
   };
 
   /**
-   * Enter Correction Mode: Ask what information to correct and listen for the correction
+   * PATH A: User confirms YES
+   * - Does NOT modify extracted information
+   * - Does NOT run another AI extraction/correction
+   * - Does NOT save visit automatically
+   * - Speaks confirmation and shows "Submit Entry" button
    */
-  const enterCorrectionMode = (initialText: string = '') => {
-    hasTriggeredConfirmRef.current = false;
+  const handleSayYes = () => {
+    speechRecognitionManager.stop();
+    voiceSynthesizer.stop();
+    setIsListening(false);
+    setMode('confirmed');
+    setSuccessNotice(strings.confirmedNotice);
+    setErrorNotice('');
+
+    // Speak: "Okay! The information is confirmed. You can now submit the entry."
+    setIsSpeaking(true);
+    voiceSynthesizer.speak(strings.confirmedNotice, language, () => {
+      setIsSpeaking(false);
+    });
+  };
+
+  /**
+   * PATH B: User says NO
+   * - Asks which information is incorrect
+   * - Opens correction interface
+   */
+  const handleSayNo = (initialText: string = '') => {
+    speechRecognitionManager.stop();
+    voiceSynthesizer.stop();
+    setIsListening(false);
     setMode('correcting');
     setCorrectionInput(initialText);
     setSuccessNotice('');
     setErrorNotice('');
-    setIsSpeaking(true);
 
-    // Speak "Which information should I correct?"
+    // Speak: "Which information should I correct?"
+    setIsSpeaking(true);
     voiceSynthesizer.speak(strings.whichInfoPrompt, language, () => {
       setIsSpeaking(false);
       startListeningForCorrection();
@@ -250,7 +305,7 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
   };
 
   /**
-   * Listen to the user articulating the correction
+   * Listen to the user speaking their correction
    */
   const startListeningForCorrection = () => {
     if (!speechRecognitionManager.isSupported() || isSaving) return;
@@ -273,7 +328,9 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
   };
 
   /**
-   * Submit Correction: Sends to backend/local engine and updates state
+   * SUBMIT CORRECTION:
+   * Process and apply the user's explicitly provided correction.
+   * Updates only relevant fields, preserves all unrelated fields.
    */
   const handleSubmitCorrection = async () => {
     const textToSubmit = correctionInput.trim();
@@ -290,7 +347,7 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
       const result = await correctVisitVoice(textToSubmit, language, data);
 
       if (result.success && result.updated) {
-        // Pass updated data to parent App component
+        // Pass updated structured data to parent App component
         const newSummary =
           language === 'ta'
             ? result.summaryTa
@@ -300,15 +357,15 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
 
         onCorrectionMade(result.updated, newSummary, result.fieldsChanged);
 
-        // Transition back to confirmation with success notice
+        // Transition back to 'confirming' mode with update notice
         setMode('confirming');
         setCorrectionInput('');
         const changedDesc = result.fieldsChanged.length > 0 ? `(${result.fieldsChanged.join(', ')})` : '';
         setSuccessNotice(`✓ ${strings.correctionSavedNotice} ${changedDesc}`);
 
-        // Read updated confirmation prompt aloud: "I've updated the information. Is everything correct now?"
+        // Read confirmation prompt aloud: "I've updated the information. Is everything correct now?"
         setIsSpeaking(true);
-        const reconfirmPrompt = `${strings.correctionSavedNotice} ${strings.confirmQuestion}`;
+        const reconfirmPrompt = `${strings.correctionSavedNotice}`;
         voiceSynthesizer.speak(reconfirmPrompt, language, () => {
           setIsSpeaking(false);
           startListeningForYesNo();
@@ -326,11 +383,12 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
   };
 
   /**
-   * Final Confirm & Save
+   * SUBMIT ENTRY:
+   * Saves the confirmed patient visit. Only triggered when user explicitly clicks Submit Entry.
    */
-  const handleConfirmAction = () => {
-    if (hasTriggeredConfirmRef.current || isSaving) return;
-    hasTriggeredConfirmRef.current = true;
+  const handleSubmitEntry = () => {
+    if (isSubmittingEntryRef.current || isSaving) return;
+    isSubmittingEntryRef.current = true;
     voiceSynthesizer.stop();
     speechRecognitionManager.stop();
     setIsListening(false);
@@ -342,7 +400,12 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
       {/* Top Header / Voice Status Pill */}
       <div className="flex items-center justify-between pb-1">
         <div className="flex items-center space-x-2 mx-auto">
-          {isSpeaking ? (
+          {mode === 'confirmed' ? (
+            <div className="inline-flex items-center space-x-1.5 px-3.5 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-200 rounded-full text-xs font-bold border border-emerald-300 dark:border-emerald-700 shadow-sm">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>{strings.confirmedBadge}</span>
+            </div>
+          ) : isSpeaking ? (
             <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-200 rounded-full text-xs font-bold animate-pulse">
               <Volume2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
               <span>{t.readingRecord}</span>
@@ -378,7 +441,9 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
         </div>
       )}
 
-      {/* MODE 1: CONFIRMATION VIEW ("Is this information correct?") */}
+      {/* ========================================================================= */}
+      {/* MODE 1: CONFIRMING VIEW ("Is this information correct?")                  */}
+      {/* ========================================================================= */}
       {mode === 'confirming' && (
         <>
           {/* Read aloud Summary Text Card */}
@@ -390,6 +455,7 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
 
           {/* Re-play audio button */}
           <button
+            type="button"
             onClick={readSummaryAloud}
             disabled={isSpeaking}
             className="text-xs text-health-primary dark:text-emerald-400 font-bold hover:underline flex items-center justify-center mx-auto space-x-1.5 touch-target"
@@ -400,116 +466,96 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
 
           {/* Primary YES / NO Confirmation Action Buttons */}
           <div className="space-y-2.5 pt-1">
-            {/* 1. YES (Confirm & Save) */}
+            {/* 1. YES: Confirms info, DOES NOT save immediately */}
             <button
-              onClick={handleConfirmAction}
+              type="button"
+              onClick={handleSayYes}
               disabled={isSaving || isProcessingCorrection}
               className="w-full touch-target min-h-[54px] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all text-white font-extrabold rounded-2xl shadow-md flex items-center justify-center space-x-2 text-base sm:text-lg cursor-pointer"
             >
-              {isSaving ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                  <span>Saving Case...</span>
-                </>
-              ) : (
-                <>
-                  <Check className="w-6 h-6 stroke-[3]" />
-                  <span>{strings.yesCorrectBtn}</span>
-                </>
-              )}
+              <Check className="w-6 h-6 stroke-[3]" />
+              <span>{strings.yesCorrectBtn}</span>
             </button>
 
-            {/* 2. NO (Enter Correction Mode) */}
+            {/* 2. NO: Opens Correction Interface */}
             <button
-              onClick={() => enterCorrectionMode()}
-              disabled={isSaving}
-              className="w-full touch-target min-h-[46px] bg-white dark:bg-dark-card hover:bg-amber-50 dark:hover:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 font-bold rounded-xl flex items-center justify-center space-x-2 text-sm transition-all shadow-sm cursor-pointer"
+              type="button"
+              onClick={() => handleSayNo()}
+              disabled={isSaving || isProcessingCorrection}
+              className="w-full touch-target min-h-[50px] bg-white dark:bg-dark-card border-2 border-amber-400 hover:border-amber-500 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 active:scale-[0.98] text-amber-900 dark:text-amber-300 font-bold rounded-2xl shadow-sm flex items-center justify-center space-x-2 text-sm sm:text-base transition-all cursor-pointer"
             >
-              <Edit3 className="w-4 h-4 text-amber-600" />
+              <Edit3 className="w-4 h-4" />
               <span>{strings.noCorrectBtn}</span>
             </button>
           </div>
         </>
       )}
 
-      {/* MODE 2: ACTIVE CORRECTION VIEW ("Which information should I correct?") */}
+      {/* ========================================================================= */}
+      {/* MODE 2: CORRECTING VIEW (Capture correction & "Submit Correction" button)  */}
+      {/* ========================================================================= */}
       {mode === 'correcting' && (
-        <div className="space-y-3 text-left pt-1 animate-fadeIn">
-          {/* Header Question */}
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center space-x-1.5">
-              <Edit3 className="w-4 h-4 text-emerald-600" />
-              <span>{strings.whichInfoPrompt}</span>
-            </h4>
-            <button
-              onClick={() => {
-                setMode('confirming');
-                speechRecognitionManager.stop();
-                setIsListening(false);
-              }}
-              className="text-xs text-gray-500 hover:text-gray-700 dark:text-dark-muted flex items-center space-x-1"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span>{strings.cancelCorrection}</span>
-            </button>
-          </div>
+        <div className="space-y-3.5 pt-1 text-left animate-in fade-in duration-200">
+          <div className="bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-2xl p-3.5">
+            <div className="flex items-center space-x-2 text-amber-900 dark:text-amber-200 font-bold text-xs sm:text-sm mb-1.5">
+              <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>{strings.askCorrection}</span>
+            </div>
 
-          <p className="text-xs text-gray-500 dark:text-dark-muted">
-            {strings.askCorrection}
-          </p>
+            {/* Editable Correction Textarea */}
+            <div className="relative mt-2">
+              <textarea
+                value={correctionInput}
+                onChange={(e) => setCorrectionInput(e.target.value)}
+                placeholder={strings.correctionPlaceholder}
+                rows={3}
+                className="w-full p-3 pr-11 text-xs sm:text-sm font-medium rounded-xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-dark-surface text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-inner"
+              />
 
-          {/* Editable Correction Textarea */}
-          <div className="relative">
-            <textarea
-              value={correctionInput}
-              onChange={(e) => setCorrectionInput(e.target.value)}
-              placeholder={strings.correctionPlaceholder}
-              rows={3}
-              className="w-full p-3 text-sm font-medium rounded-xl border-2 border-emerald-400 dark:border-emerald-600 bg-emerald-50/30 dark:bg-emerald-950/20 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 leading-relaxed"
-            />
+              {/* Dictate / Re-speak Mic Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (isListening) {
+                    speechRecognitionManager.stop();
+                    setIsListening(false);
+                  } else {
+                    startListeningForCorrection();
+                  }
+                }}
+                title={isListening ? 'Stop listening' : 'Speak correction'}
+                className={`absolute right-2.5 top-2.5 p-2 rounded-lg transition-all touch-target cursor-pointer ${
+                  isListening
+                    ? 'bg-red-500 text-white animate-pulse'
+                    : 'bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/60 dark:hover:bg-amber-800 text-amber-800 dark:text-amber-200'
+                }`}
+              >
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {/* Voice status cue while speaking correction */}
             {isListening && (
-              <div className="absolute right-3 bottom-3 flex items-center space-x-1 text-[11px] font-bold text-red-600 bg-white/90 dark:bg-dark-card/90 px-2 py-0.5 rounded-full border border-red-200">
-                <span className="w-2 h-2 rounded-full bg-red-600 animate-ping" />
-                <span>Listening...</span>
-              </div>
+              <p className="text-[11px] text-red-600 dark:text-red-400 font-bold flex items-center space-x-1 mt-1.5 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping inline-block" />
+                <span>{strings.listeningCorrectionPrompt}</span>
+              </p>
             )}
           </div>
 
-          {/* COMPACT, CLEARLY VISIBLE "SUBMIT CORRECTION" BUTTON & MIC CONTROLS */}
-          <div className="flex items-center justify-between space-x-2 pt-1">
-            {/* Mic Toggle Button to Re-speak */}
+          {/* Action Row: Compact "Submit Correction" + "Cancel" */}
+          <div className="flex items-center space-x-2.5 pt-1">
+            {/* 1. Small, Neat "Submit Correction" Button */}
             <button
-              onClick={() => {
-                if (isListening) {
-                  speechRecognitionManager.stop();
-                  setIsListening(false);
-                } else {
-                  startListeningForCorrection();
-                }
-              }}
               type="button"
-              title={strings.reRecord}
-              className={`p-2.5 rounded-xl border font-bold text-xs flex items-center space-x-1.5 transition-all touch-target ${
-                isListening
-                  ? 'bg-red-50 text-red-700 border-red-300 animate-pulse'
-                  : 'bg-gray-100 hover:bg-gray-200 dark:bg-dark-surface border-gray-300 dark:border-dark-border text-gray-700 dark:text-dark-muted'
-              }`}
-            >
-              <Mic className="w-4 h-4 text-emerald-600" />
-              <span className="text-xs">{isListening ? 'Stop' : strings.reRecord}</span>
-            </button>
-
-            {/* Compact Submit Correction Button */}
-            <button
               onClick={handleSubmitCorrection}
               disabled={!correctionInput.trim() || isProcessingCorrection}
-              type="button"
-              className="flex-1 min-h-[44px] px-4 rounded-xl font-bold text-sm shadow-sm transition-all duration-200 flex items-center justify-center space-x-2 touch-target bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="flex-1 touch-target min-h-[46px] bg-amber-600 hover:bg-amber-700 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all text-white font-black rounded-xl shadow-md flex items-center justify-center space-x-2 text-sm cursor-pointer"
             >
               {isProcessingCorrection ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1.5" />
-                  <span>{strings.submitting}</span>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>{strings.submittingCorrection}</span>
                 </>
               ) : (
                 <>
@@ -518,11 +564,72 @@ export const VoiceConfirmation: React.FC<VoiceConfirmationProps> = ({
                 </>
               )}
             </button>
+
+            {/* 2. Cancel / Back to Confirmation */}
+            <button
+              type="button"
+              onClick={() => {
+                speechRecognitionManager.stop();
+                voiceSynthesizer.stop();
+                setIsListening(false);
+                setMode('confirming');
+              }}
+              disabled={isProcessingCorrection}
+              className="py-2.5 px-4 rounded-xl border border-gray-300 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-surface text-gray-700 dark:text-gray-300 font-bold text-xs transition-all touch-target cursor-pointer"
+            >
+              <span>{strings.cancelCorrection}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODE 3: CONFIRMED VIEW (Primary "Submit Entry" Button)                     */}
+      {/* ========================================================================= */}
+      {mode === 'confirmed' && (
+        <div className="space-y-4 pt-1 animate-in fade-in duration-200">
+          {/* Confirmed Summary Card */}
+          <div className="bg-emerald-50/70 dark:bg-emerald-950/40 p-4 rounded-2xl border border-emerald-300 dark:border-emerald-700 text-left">
+            <div className="flex items-center space-x-2 mb-2 text-emerald-900 dark:text-emerald-300 font-black text-xs uppercase tracking-wider">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Final Verified Clinical Record</span>
+            </div>
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 leading-relaxed italic">
+              "{summaryText}"
+            </p>
           </div>
 
-          <div className="text-[11px] text-gray-500 dark:text-dark-muted pt-0.5 italic">
-            💡 {strings.quickBpTip}
-          </div>
+          {/* Primary Action Button: "SUBMIT ENTRY" (Saves the case) */}
+          <button
+            type="button"
+            onClick={handleSubmitEntry}
+            disabled={isSaving}
+            className="w-full touch-target min-h-[56px] bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all text-white font-black rounded-2xl shadow-xl flex items-center justify-center space-x-3 text-lg cursor-pointer"
+          >
+            {isSaving ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                <span>{strings.savingEntryBtn}</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-6 h-6 stroke-[2.5]" />
+                <span>{strings.submitEntryBtn}</span>
+                <ArrowRight className="w-5 h-5 ml-1 stroke-[2.5]" />
+              </>
+            )}
+          </button>
+
+          {/* Secondary Option: Edit Details / Make Correction if needed */}
+          <button
+            type="button"
+            onClick={() => handleSayNo()}
+            disabled={isSaving}
+            className="text-xs text-gray-500 dark:text-dark-muted font-bold hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline flex items-center justify-center mx-auto space-x-1.5 touch-target"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            <span>{strings.editConfirmed}</span>
+          </button>
         </div>
       )}
     </div>

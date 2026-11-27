@@ -76,7 +76,7 @@ export async function parseApiResponse<T = any>(res: Response): Promise<ParsedAp
         ok: false,
         status: 405,
         data: null,
-        error: 'The server endpoint does not allow this method. Please verify backend API deployment.'
+        error: 'The backend service endpoint is currently offline or unreachable. Please try again or use offline mode.'
       };
     }
     if (res.status === 502 || res.status === 503 || res.status === 504) {
